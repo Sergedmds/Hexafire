@@ -1,0 +1,23 @@
+# HEXAFIRE - configuration du moteur
+# Les chemins relatifs sont relatifs au dossier qui contient ce fichier.
+
+[chemins]
+donnees_brutes   = "../donnees_brutes"     # sorties de telecharger_archives.sh
+donnees_preparees = "../donnees_preparees" # détections filtrées, un fichier par mois et par capteur
+agregats         = "../agregats"           # comptages cellule x mois
+journaux         = "../journaux"
+
+[grille]
+pas_degres = 0.25          # cellules de 0,25 degré (1440 x 720 cellules)
+
+[filtres]
+types_conserves = [0]      # 0 = feu de végétation présumé (P4)
+confiance_modis_min = 30   # P3 : exclusion des confiances < 30
+confiance_viirs_exclues = ["l"]   # P2 : exclusion de la classe « faible » (jamais filtrer sur « haute » seule)
+
+[periodes]
+debut_reference = 2003
+fin_reference = 2020
+debut_calibration = 2012
+fin_calibration = 2020
+bascule_viirs = "2021-01"

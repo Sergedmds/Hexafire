@@ -1,0 +1,26 @@
+# Données volumineuses (téléchargées ou recalculées) : jamais dans le dépôt
+donnees_brutes/
+donnees_preparees/
+agregats/
+journaux/
+
+# Données publiées de l'application : déployées sur la branche gh-pages par publier_site.sh
+hexafire_web/donnees/
+
+# Python
+**/.venv/
+**/.vene/
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# LaTeX (fichiers intermédiaires)
+*.aux
+*.log
+*.out
+*.toc
+*.synctex.gz
+
+# Divers
+.DS_Store
+*.tmp

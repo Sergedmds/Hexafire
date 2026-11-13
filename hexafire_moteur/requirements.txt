@@ -1,0 +1,5 @@
+pandas>=2.1
+numpy>=1.26
+pyarrow>=14      # facultatif : sans lui, les tables sont écrites en CSV compressé
+requests>=2.31   # module firms (API NASA FIRMS)
+pytest>=7.4

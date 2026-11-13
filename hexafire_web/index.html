@@ -1,0 +1,166 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>HEXAFIRE — calendrier des feux</title>
+  <script>
+    // Thème appliqué avant l'affichage pour éviter un flash
+    try { const th = localStorage.getItem("hexafire-theme"); if (th) document.documentElement.dataset.theme = th; } catch (e) {}
+  </script>
+  <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div id="carte" role="application" data-i18n-aria="carte_aria"></div>
+<div id="carte-absente" hidden data-i18n="carte_absente"></div>
+
+<header id="entete">
+  <strong>HEXAFIRE</strong>
+  <span data-i18n="sous_titre"></span>
+  <span id="bandeau-exemple" hidden data-i18n="exemple"></span>
+</header>
+
+<aside id="panneau" data-i18n-aria="panneau_aria">
+  <button id="btn-replier" class="replier" type="button" aria-expanded="true" data-i18n-title="replier">◀</button>
+  <div class="contenu">
+    <div class="outils">
+      <span>
+        <button id="btn-langue" type="button" class="petit" data-i18n-title="langue">EN</button>
+        <button id="btn-theme" type="button" class="petit" data-i18n-title="theme" ></button>
+      </span>
+    </div>
+    <section class="etape">
+      <h2><span class="etape-num">1</span> <span data-i18n="e1"></span></h2>
+      <div class="onglets-zone" role="tablist">
+        <button type="button" data-zone="cercle" class="actif" data-i18n="z_point"></button>
+        <button type="button" data-zone="rect" data-i18n="z_rect"></button>
+        <button type="button" data-zone="poly" data-i18n="z_poly"></button>
+        <button type="button" data-zone="pays" data-i18n="z_pays"></button>
+      </div>
+      <div data-panneau="cercle">
+        <p class="aide" data-i18n="aide_point"></p>
+        <form id="form-lieu" class="ligne-lieu">
+          <label class="large"><span data-i18n="lieu"></span> <input id="in-lieu" type="search" data-i18n-ph="lieu_ph" autocomplete="off"></label>
+          <button type="submit" aria-label="OK">⌕</button>
+        </form>
+        <p id="lieu-etat" class="aide"></p>
+        <div class="grille2">
+          <label><span data-i18n="lat"></span> <input id="in-lat" type="number" step="0.01" min="-90" max="90" value="9.5"></label>
+          <label><span data-i18n="lon"></span> <input id="in-lon" type="number" step="0.01" min="-180" max="180" value="2.3"></label>
+          <label><span data-i18n="rayon"></span> <input id="in-rayon" type="number" step="10" min="15" max="2000" value="150"></label>
+        </div>
+      </div>
+      <div data-panneau="rect" hidden>
+        <p class="aide" data-i18n="aide_rect"></p>
+        <div class="grille2">
+          <label><span data-i18n="nord"></span> <input id="in-nord" type="number" step="0.25" value="12.5"></label>
+          <label><span data-i18n="sud"></span> <input id="in-sud" type="number" step="0.25" value="6"></label>
+          <label><span data-i18n="ouest"></span> <input id="in-ouest" type="number" step="0.25" value="0.5"></label>
+          <label><span data-i18n="est"></span> <input id="in-est" type="number" step="0.25" value="4"></label>
+        </div>
+      </div>
+      <div data-panneau="poly" hidden>
+        <p class="aide" data-i18n="aide_poly"></p>
+        <p id="poly-etat" class="aide"></p>
+      </div>
+      <div data-panneau="pays" hidden>
+        <label><span data-i18n="pays"></span> <select id="in-pays"><option value="" data-i18n="chargement"></option></select></label>
+        <p id="pays-absent" class="aide" hidden data-i18n-html="pays_absent"></p>
+      </div>
+      <p id="resume-zone" class="aide"></p>
+    </section>
+
+    <section class="etape">
+      <h2><span class="etape-num">2</span> <span data-i18n="e2"></span></h2>
+      <div class="grille2">
+        <label><span data-i18n="de"></span> <select id="in-debut"></select></label>
+        <label><span data-i18n="a"></span> <select id="in-fin"></select></label>
+      </div>
+      <p class="aide" data-i18n="aide_normale"></p>
+    </section>
+
+    <section class="etape">
+      <h2><span class="etape-num">3</span> <span data-i18n="e3"></span></h2>
+      <div role="radiogroup" data-i18n-aria="grandeur" class="choix">
+        <label><input type="radio" name="mode" value="niveau" checked> <span data-i18n="m_niveau"></span></label>
+        <label><input type="radio" name="mode" value="anomalie"> <span data-i18n="m_anomalie"></span></label>
+      </div>
+      <label class="choix-select"><span data-i18n="unite"></span>
+        <select id="in-unite"><option value="modis" data-i18n="u_modis"></option>
+          <option value="viirs" data-i18n="u_viirs"></option></select></label>
+      <p class="aide" data-i18n="aide_unite"></p>
+    </section>
+
+    <section class="etape">
+      <h2><span class="etape-num">4</span> <span data-i18n="e4"></span></h2>
+      <button id="btn-afficher" class="principal" type="button" data-i18n="afficher"></button>
+      <div class="boutons">
+        <button id="btn-csv" type="button" disabled data-i18n="b_csv"></button>
+        <button id="btn-cellules" type="button" disabled data-i18n="b_cellules"></button>
+        <button id="btn-json" type="button" disabled>JSON</button>
+        <button id="btn-png" type="button" disabled>PNG</button>
+        <button id="btn-svg" type="button" disabled>SVG</button>
+      </div>
+    </section>
+  </div>
+</aside>
+
+<section id="boite-couche" aria-labelledby="titre-couche">
+  <div class="ligne">
+    <strong id="titre-couche" data-i18n="couche"></strong>
+    <select id="in-couche">
+      <option value="aucune" data-i18n="c_aucune"></option>
+      <option value="niveau" data-i18n="c_niveau"></option>
+      <option value="anomalie" data-i18n="c_anomalie"></option>
+    </select>
+  </div>
+  <div id="couche-options" hidden>
+    <label><span><span data-i18n="c_mois"></span> : <strong id="couche-mois"></strong></span>
+      <input id="in-couche-t" type="range" min="0" max="0" value="0"></label>
+    <div id="couche-legende"></div>
+    <p class="aide" data-i18n="c_aide"></p>
+  </div>
+</section>
+
+<section id="resultats" data-i18n-aria="resultats" hidden>
+  <div class="barre">
+    <div role="tablist" class="onglets">
+      <button type="button" role="tab" data-onglet="calendrier" class="actif" data-i18n="o_calendrier"></button>
+      <button type="button" role="tab" data-onglet="analyses" data-i18n="o_analyses"></button>
+      <button type="button" role="tab" data-onglet="capteurs" data-i18n="o_capteurs"></button>
+      <button type="button" role="tab" data-onglet="methode" data-i18n="o_methode"></button>
+    </div>
+    <div class="actions">
+      <button id="btn-lien" type="button" data-i18n-title="copier_titre" data-i18n="copier"></button>
+      <button id="btn-fermer" type="button" data-i18n-title="fermer">✕</button>
+    </div>
+  </div>
+  <p id="titre-resultats" class="aide"></p>
+
+  <div data-vue="calendrier">
+    <div id="indicateurs" class="indicateurs"></div>
+    <div id="calendrier"></div>
+    <div id="legende"></div>
+  </div>
+  <div data-vue="analyses" hidden>
+    <h3 data-i18n="h_profil"></h3><div id="g-profil"></div>
+    <h3 data-i18n="h_saison"></h3><div id="g-saison"></div>
+    <div class="deux-colonnes">
+      <div><h3 data-i18n="h_annees"></h3><div id="t-annees"></div></div>
+      <div><h3 data-i18n="h_inhabituels"></h3><div id="t-inhabituels"></div></div>
+    </div>
+  </div>
+  <div data-vue="capteurs" hidden>
+    <h3 data-i18n="h_capteurs"></h3><div id="g-capteurs"></div>
+    <h3 data-i18n="h_validation"></h3><div id="t-validation"></div>
+  </div>
+  <div data-vue="methode" hidden id="methode"></div>
+  <p class="aide avertissement" data-i18n="avertissement"></p>
+</section>
+
+<div id="infobulle" role="tooltip" hidden></div>
+<script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js" defer></script>
+<script type="module" src="js/main.js"></script>
+</body>
+</html>
