@@ -85,6 +85,7 @@ def test_chaine_calibrer(tmp_path):
     cm = pd.DataFrame(lignes, columns=["cellule", "annee", "mois", "capteur", "jour_nuit", "n", "frp_somme"])
     tables.ecrire(cm, tables.chemin_table(tmp_path, "cell_month"))
     conv = calibrer(cfg)
+    assert np.isfinite(conv["se_stab"]).all() and (conv["se_stab"] > 0).all()
     fac = conv.groupby("jour_nuit")["facteur_viirs_vers_modis"].median()
     assert abs(fac["J"] - 1 / 4) < 0.02 and abs(fac["N"] - 1 / 12) < 0.01
 
@@ -105,6 +106,21 @@ def test_serie_apres_calibrage(tmp_path):
     w = equivalent_viirs(cfg, s)
     v = s["source"] == "VIIRS (converti)"
     assert 0.9 < w[v].sum() / s.loc[v, "n_brut"].sum() < 1.1
+    # Incertitude de conversion : nulle pour MODIS mesuré en équivalent MODIS, positive pour VIIRS converti,
+    # et inversement en équivalent VIIRS
+    from hexafire.publication import incertitude
+    e, f = incertitude(cfg, s)
+    m = s["source"].str.startswith("MODIS")
+    assert (e[m] == 0).all() and (e[v] > 0).all() and np.isfinite(e).all()
+    assert (f[v] == 0).all() and (f[m] > 0).all()
+    assert (e[v] / s.loc[v, "N_harm"]).median() < 0.5
+    # Publication complète : la FRP de la source du mois est écrite dans les tuiles
+    import json
+    from hexafire.publication import publier
+    publier(cfg, tmp_path / "site")
+    idx = json.loads((tmp_path / "site" / "index.json").read_text())
+    tu = json.loads((tmp_path / "site" / "tuiles" / f"t_{idx['tuiles'][0]}.json").read_text())
+    assert len(tu["p"]) == len(tu["b"]) and all(x >= 0 for x in tu["p"])
 
 
 def test_calibrer_mois_sans_occasions(tmp_path):
@@ -117,6 +133,7 @@ def test_calibrer_mois_sans_occasions(tmp_path):
     jd = jd[~((jd["capteur"] == "S-NPP") & (jd["annee"] == 2013))]
     tables.ecrire(jd, tables.chemin_table(tmp_path, "jours_disponibles"))
     conv = calibrer(cfg)
+    assert np.isfinite(conv["se_stab"]).all() and (conv["se_stab"] > 0).all()
     fac = conv.groupby("jour_nuit")["facteur_viirs_vers_modis"].median()
     assert abs(fac["J"] - 1 / 4) < 0.03 and abs(fac["N"] - 1 / 12) < 0.015
 

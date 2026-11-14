@@ -1,9 +1,9 @@
-# HEXAFIRE — Harmonized MODIS + VIIRS hotspot calendar, 2000 → today
+# HEXAFIRE, a harmonized MODIS and VIIRS hotspot calendar from 2000 to today
 
-**NASA Space Apps Challenge 2026 — challenge “Harmonization of MODIS and VIIRS Hot Spots”**
+**NASA Space Apps Challenge 2026, challenge “Harmonization of MODIS and VIIRS Hot Spots”**
 Team HEXAFIRE (ENSGMM / UNSTIM, Benin)
 
-🔗 **Live app:** `https://<github-user>.github.io/<repo>/` · 📘 User guide (FR): [`hexafire_web/docs/GUIDE_UTILISATEUR.pdf`](hexafire_web/docs/GUIDE_UTILISATEUR.pdf)
+**Live app** [sergedmds.github.io/Hexafire](https://sergedmds.github.io/Hexafire/). User guide in French in [`hexafire_web/docs/GUIDE_UTILISATEUR.pdf`](hexafire_web/docs/GUIDE_UTILISATEUR.pdf).
 
 ## The problem
 
@@ -29,6 +29,7 @@ history.
    - seasonal analyses;
    - the sensor-change proof;
    - a monthly world map;
+   - the 95% conversion uncertainty of each converted month, and the mean fire radiative power (not harmonized);
    - CSV / JSON / PNG / SVG downloads and a shareable link.
 
    Available in French and English, with light and dark themes.
@@ -64,7 +65,7 @@ HEXAFIRE beats the single-factor approach: the 95% bootstrap interval of kappa(H
 | `hexafire_moteur/` | Harmonization engine (Python 3.12): download prep, aggregation, overpasses, calibration, validation, series, publication. Run guide: `GUIDE_EXECUTION.md` (FR) |
 | `hexafire_web/` | Static web app; `FICHE_TECHNIQUE.pdf` (technical sheet), `docs/GUIDE_UTILISATEUR.pdf` (user guide) |
 | `telecharger_archives.sh` | Download of the MODIS/VIIRS monthly archives (UMD SFTP mirror of NASA FIRMS) |
-| `HEXAFIRE_v2_fusion.tex` | Research document (methods, state of the art, design) |
+| `HEXAFIRE_document.pdf` | Research document (state of the art, methods, results) |
 | `publier_site.sh` | Deploys the app and its data to GitHub Pages (`gh-pages` branch) |
 
 Large data folders (`donnees_brutes/`, `donnees_preparees/`, `agregats/`, `journaux/`, `hexafire_web/donnees/`) are not
@@ -113,4 +114,4 @@ the project submission.
 
 ## Team
 
-HEXAFIRE — ENSGMM / UNSTIM (Abomey, Benin).
+Team HEXAFIRE, ENSGMM / UNSTIM (Abomey, Benin).

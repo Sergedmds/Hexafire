@@ -41,6 +41,8 @@ def main(argv: list[str] | None = None) -> None:
     fi = sub.add_parser("firms", help="mois récents via l'API FIRMS (clé : FIRMS_MAP_KEY ou --cle)")
     fi.add_argument("--cle", default=None)
     fi.add_argument("--seulement-preparer", action="store_true", help="ne rien télécharger, préparer les CSV déjà là")
+    fi.add_argument("--capteurs", default=None,
+                    help="limiter le téléchargement, ex. MODIS,S-NPP (défaut : MODIS,S-NPP,NOAA-20,NOAA-21)")
     pu = sub.add_parser("publier")
     pu.add_argument("--exemple", action="store_true", help="jeu fictif pour développer l'application")
     pu.add_argument("--dossier", default=None, help="défaut : ../hexafire_web/donnees")
@@ -72,7 +74,7 @@ def main(argv: list[str] | None = None) -> None:
         if a.seulement_preparer:
             firms_recent.preparer_api(cfg)
         else:
-            firms_recent.executer(cfg, a.cle)
+            firms_recent.executer(cfg, a.cle, a.capteurs.split(",") if a.capteurs else None)
     elif a.commande == "publier":
         from pathlib import Path
         dossier = Path(a.dossier) if a.dossier else (RACINE.parent / "hexafire_web" / "donnees")

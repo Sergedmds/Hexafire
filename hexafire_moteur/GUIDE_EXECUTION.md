@@ -1,4 +1,4 @@
-# HEXAFIRE — faire tourner le moteur depuis le début
+# Faire tourner le moteur HEXAFIRE depuis le début
 
 Ce guide décrit la chaîne complète, des archives téléchargées jusqu'aux fichiers de l'application web.
 Pour chaque étape : ce qu'elle fait, la commande, ce qui s'affiche et comment le lire. Les modèles mathématiques de
@@ -6,7 +6,7 @@ chaque étape sont détaillés dans `hexafire_web/docs/DOSSIER_TECHNIQUE.pdf` (s
 
 ## 0. Avant de commencer
 
-**Installation (une fois)** — Python ≥ 3.11, et `lftp` pour le téléchargement :
+**Installation (une fois).** Il faut Python 3.11 ou plus récent, et `lftp` pour le téléchargement.
 
 ```bash
 sudo apt install lftp                      # Ubuntu / Debian
@@ -73,9 +73,9 @@ python -m hexafire preparer && python -m hexafire agreger && python -m hexafire 
 
 ---
 
-## 1. `inventaire` — que va-t-on utiliser ?
+## 1. `inventaire`, ce qui sera utilisé
 
-**Ce que ça fait** : parcourt `donnees_brutes/`, reconnaît chaque archive (produit, année, mois, version)
+**Ce que ça fait**. Parcourt `donnees_brutes/`, reconnaît chaque archive (produit, année, mois, version)
 et dit ce qui sera utilisé. Ne modifie rien. Si deux versions du même mois existent, la plus récente
 est retenue (MODIS : collection 6 jusqu'en 2022, 6.1 ensuite).
 
@@ -97,9 +97,9 @@ Dossier : /home/.../donnees_brutes
 - pour calibrer, il faut **VNP14IMGML de 2012 à 2020** (108 mois) ;
 - un trou (moins de mois que l'intervalle) signale un fichier manquant ou encore en téléchargement.
 
-## 2. `preparer` — filtrer et ranger les détections
+## 2. `preparer`, filtrer et ranger les détections
 
-**Ce que ça fait** : lit chaque archive, garde uniquement les détections utiles (type 0, confiance),
+**Ce que ça fait**. Lit chaque archive, garde uniquement les détections utiles (type 0, confiance),
 les met dans un format commun et écrit un fichier par capteur (Terra, Aqua, S-NPP, NOAA-20, NOAA-21)
 et par mois dans `donnees_preparees/`. Chaque archive traitée est notée dans
 `journaux/preparation.jsonl` avec son empreinte : **relancer ne refait que les nouvelles archives**.
@@ -126,9 +126,9 @@ python -m hexafire preparer --forcer                # tout refaire (après chang
   `preparer` quand le téléchargement est fini ;
 - une archive déjà préparée n'apparaît pas : c'est normal.
 
-## 3. `firms` (facultatif) — les mois les plus récents
+## 3. `firms` (facultatif), les mois les plus récents
 
-**Ce que ça fait** : télécharge par l'API FIRMS ce qui manque après la fin des archives du serveur
+**Ce que ça fait**. Télécharge par l'API FIRMS ce qui manque après la fin des archives du serveur
 (MODIS après août 2026, VIIRS après juillet 2026), puis le prépare comme à l'étape 2 (fichiers
 `<capteur>_<AAAAMM>_api`). Reprend là où il s'était arrêté. Peut tourner **en même temps** que les
 téléchargements SFTP. À lancer **avant** `agreger`.
@@ -152,9 +152,9 @@ API FIRMS : 1,254,330 détections lues, 1,050,112 retenues, 12 fichiers capteur-
   Attendez quelques minutes et relancez ;
 - quand l'archive d'un mois arrive plus tard, `agreger` ignore automatiquement la version API de ce mois.
 
-## 4. `agreger` — compter par cellule et par mois
+## 4. `agreger`, compter par cellule et par mois
 
-**Ce que ça fait** : compte les détections par cellule de 0,25°, mois, capteur et période (jour/nuit).
+**Ce que ça fait**. Compte les détections par cellule de 0,25°, mois, capteur et période (jour/nuit).
 C'est la table de base de tout le reste (`agregats/cell_month`). Elle produit aussi les comptages
 mondiaux par jour (`capteur_jour`), qui servent à repérer les jours sans données, et un résumé
 `agregats/resume_mensuel.csv`.
@@ -175,9 +175,9 @@ cell_month : 48,215,330 lignes, 512,904,118 détections -> .../agregats/cell_mon
 - ouvrez `resume_mensuel.csv` (tableur) : un mois avec beaucoup moins de détections que ses voisins
   signale un fichier incomplet ou une panne du satellite.
 
-## 5. `occasions` — combien de fois chaque cellule a été vue
+## 5. `occasions`, combien de fois chaque cellule a été vue
 
-**Ce que ça fait** : calcule le nombre de passages de chaque satellite au-dessus de chaque cellule (selon la
+**Ce que ça fait**. Calcule le nombre de passages de chaque satellite au-dessus de chaque cellule (selon la
 latitude et la fauchée) et repère les **jours sans données**. Un jour compte comme manquant quand le
 capteur détecte moins de 10 % de son activité mondiale habituelle. Sans ce calcul, on confondrait
 « moins de feux » et « moins de passages ».
@@ -203,9 +203,9 @@ occasions : 412,880 cellules actives, 1,104 capteur-mois -> .../agregats
   corrigés par le nombre de jours réels. Sous 80 % de jours, ils seront marqués
   « couverture partielle », et « non observé » sous 30 %.
 
-## 6. `calibrer` — apprendre le facteur VIIRS → MODIS
+## 6. `calibrer`, apprendre le facteur VIIRS → MODIS
 
-**Ce que ça fait** : sur 2012–2020, quand MODIS et S-NPP observaient ensemble, estime combien un point chaud
+**Ce que ça fait**. Sur 2012–2020, quand MODIS et S-NPP observaient ensemble, estime combien un point chaud
 S-NPP vaut de points chauds MODIS, à nombre de passages égal. Le facteur est estimé par strate (bloc de 10°),
 mois de l'année et jour/nuit, puis stabilisé (estimations peu sûres rapprochées de la valeur annuelle de la
 strate). Raccorde ensuite NOAA-20 et NOAA-21 à S-NPP sur leurs années communes.
@@ -225,11 +225,11 @@ Calibration S-NPP -> MODIS sur 2012-2020 (9 année(s)), 2,104,556 couples cellul
 ```
 
 **Comment la lire** :
-- **jour** : facteur attendu entre **0,15 et 0,25** (VIIRS voit 4 à 7 fois plus de points chauds que MODIS).
+- **jour**. Facteur attendu entre **0,15 et 0,25** (VIIRS voit 4 à 7 fois plus de points chauds que MODIS).
   Premiers résultats 2012–2013 : 0,185, soit 5,4 fois ;
-- **nuit** : facteur plus faible, autour de **0,05 à 0,10** (10 à 20 fois plus). Premier résultat : 0,064 ;
+- **nuit**. Facteur plus faible, autour de **0,05 à 0,10** (10 à 20 fois plus). Premier résultat : 0,064 ;
 - l'intervalle 10 %–90 % montre la variation entre régions : c'est justement ce qu'un facteur unique raterait ;
-- **NOAA-20 et NOAA-21** : facteur proche de **1** (même instrument que S-NPP). Un écart de ±10 % est plausible.
+- **NOAA-20 et NOAA-21**. Facteur proche de **1** (même instrument que S-NPP). Un écart de ±10 % est plausible.
   Un écart beaucoup plus grand est suspect ;
 - `attention : … couples sans occasions connues, exclus` : vous n'avez pas relancé `occasions` après
   `agreger`. Relancez `occasions`, puis `calibrer` ;
@@ -237,14 +237,14 @@ Calibration S-NPP -> MODIS sur 2012-2020 (9 année(s)), 2,104,556 couples cellul
 - `pas encore de recouvrement avec S-NPP` : les fichiers NOAA ne sont pas encore préparés. Ce n'est pas
   bloquant.
 
-## 7. `valider` — la conversion donne-t-elle les bons verdicts ?
+## 7. `valider`, vérifier que la conversion donne les bons verdicts
 
-**Ce que ça fait** : pour chaque année de 2012 à 2020, refait la calibration **sans cette année**, convertit
+**Ce que ça fait**. Pour chaque année de 2012 à 2020, refait la calibration **sans cette année**, convertit
 VIIRS pour cette année-là et compare au vrai MODIS. On compare le verdict de chaque mois (bas / normal /
 haut par rapport aux seuils 10 % et 90 % de 2003–2011) avec trois méthodes :
-- **HEXAFIRE** : notre conversion ;
-- **M1** : un seul facteur pour le monde ;
-- **M0** : VIIRS brut, sans conversion.
+- **HEXAFIRE**. Notre conversion ;
+- **M1**. Un seul facteur pour le monde ;
+- **M0**. VIIRS brut, sans conversion.
 
 ```bash
 python -m hexafire valider
@@ -279,9 +279,9 @@ M1 facteur global  0.543   ...              0.236         0.024           0.245 
 - fichiers écrits dans `journaux/` : `validation_resultats.csv` (le tableau, repris par l'application) et
   `validation_detail.csv.gz` (chaque strate-mois, pour creuser une région).
 
-## 8. `serie` — construire la série harmonisée 2000 → aujourd'hui
+## 8. `serie`, construire la série harmonisée de 2000 à aujourd'hui
 
-**Ce que ça fait** : assemble une seule série, en équivalent MODIS, pour chaque cellule et chaque mois.
+**Ce que ça fait**. Assemble une seule série, en équivalent MODIS, pour chaque cellule et chaque mois.
 Chaque valeur est ramenée au même nombre de passages (médiane 2003–2020).
 
 | Période | Source | Statut |
@@ -314,9 +314,9 @@ provisoire                1
 - contrôle visuel : dans l'onglet **Capteurs** de l'application, la courbe harmonisée ne doit **pas
   sauter** en 2021, contrairement à la courbe brute.
 
-## 9. `publier` — préparer les fichiers de l'application
+## 9. `publier`, préparer les fichiers de l'application
 
-**Ce que ça fait** : écrit dans `../hexafire_web/donnees/` :
+**Ce que ça fait**. Écrit dans `../hexafire_web/donnees/` :
 - `index.json` (mois, statuts, validation) ;
 - les tuiles de 5° (équivalent MODIS, équivalent VIIRS, brut) ;
 - les cartes mensuelles de 1° (valeur et rapport à la normale).

@@ -157,6 +157,22 @@ def dersimonian_laird(alpha_k: np.ndarray, se_k: np.ndarray) -> float:
     return float(max(0.0, (Q - (ok.sum() - 1)) / denom)) if denom > 0 else 0.0
 
 
+def se_stabilise(conv: pd.DataFrame) -> np.ndarray:
+    """Erreur type de alpha_stab = lambda * alpha_mois + (1 - lambda) * alpha_strate.
+
+    Variance a posteriori du modèle à effets aléatoires : lambda * se_mois^2 (= tau2 se^2 / (tau2 + se^2)),
+    plus l'incertitude de la valeur de la strate, (1 - lambda)^2 * se_strate^2.
+    """
+    lam = conv["poids_local"].to_numpy(dtype="float64")
+    se = conv["se"].to_numpy(dtype="float64")
+    se_r = conv["se_r"].to_numpy(dtype="float64") if "se_r" in conv else np.full(len(conv), np.nan)
+    # se infini (groupe dégénéré) <=> poids local nul : on remplace avant le produit pour éviter 0 x inf
+    se0 = np.where(np.isfinite(se), se, 0.0)
+    terme_local = np.nan_to_num(lam, nan=0.0) * se0 ** 2
+    terme_strate = np.where(np.isfinite(se_r), (1 - lam) ** 2 * np.where(np.isfinite(se_r), se_r, 0.0) ** 2, np.nan)
+    return np.sqrt(terme_local + terme_strate)
+
+
 def estimer_conversion(cfg: Config, plateforme: str = "S-NPP", reference: tuple[str, ...] = MODIS,
                        annees: tuple[int, int] | None = None, taille_bloc: float = 10.0,
                        couples: pd.DataFrame | None = None) -> pd.DataFrame:
@@ -187,8 +203,11 @@ def estimer_conversion(cfg: Config, plateforme: str = "S-NPP", reference: tuple[
         # conversion explicite en float : évite les erreurs de type avec les chaînes Arrow (pyarrow)
         return np.array([alpha_monde.get(str(p), np.nan) for p in periodes], dtype="float64")
 
+    se_monde = {str(k): float(v) for k, v in zip(rg["groupe"], rg["se"])}
     degenere = ~np.isfinite(rr["se"].to_numpy(dtype="float64"))
     rr["alpha"] = np.where(degenere, vers_monde(rr["jour_nuit"]), rr["alpha"].to_numpy(dtype="float64"))
+    rr["se"] = np.where(degenere, [se_monde.get(str(p), np.nan) for p in rr["jour_nuit"]],
+                        rr["se"].to_numpy(dtype="float64"))
 
     rk = rk.merge(rr[["strate", "jour_nuit", "alpha", "se"]].rename(columns={"alpha": "alpha_r", "se": "se_r"}),
                   on=["strate", "jour_nuit"], how="left")
@@ -202,6 +221,7 @@ def estimer_conversion(cfg: Config, plateforme: str = "S-NPP", reference: tuple[
     rk["alpha_stab"] = rk["poids_local"] * rk["alpha"].where(np.isfinite(rk["se"]), 0) \
         + (1 - rk["poids_local"]) * rk["alpha_r"]
     rk["facteur_viirs_vers_modis"] = np.exp(-rk["alpha_stab"])
+    rk["se_stab"] = se_stabilise(rk)
     rk["plateforme"] = plateforme
     rk["taille_bloc"] = taille_bloc
     return rk.drop(columns=["groupe"])
@@ -219,13 +239,20 @@ def calibrer_relais(cfg: Config, base: pd.DataFrame, conv_snpp: pd.DataFrame, ta
             print(f"  {plat} : pas encore de recouvrement avec S-NPP, relais non calculé")
             continue
         delta = estimer_conversion(cfg, couples=couples, taille_bloc=taille_bloc, plateforme=plat)
-        d = delta[["strate", "mois", "jour_nuit", "alpha_stab"]].rename(columns={"alpha_stab": "delta"})
-        c = conv_snpp[["strate", "mois", "jour_nuit", "alpha_stab"]].merge(d, on=["strate", "mois", "jour_nuit"], how="left")
+        d = delta[["strate", "mois", "jour_nuit", "alpha_stab", "se_stab"]].rename(
+            columns={"alpha_stab": "delta", "se_stab": "se_delta"})
+        cs = conv_snpp.copy()
+        if "se_stab" not in cs:
+            cs["se_stab"] = se_stabilise(cs)
+        c = cs[["strate", "mois", "jour_nuit", "alpha_stab", "se_stab"]].merge(d, on=["strate", "mois", "jour_nuit"], how="left")
         delta_monde = d.groupby("jour_nuit")["delta"].median()
         dm = np.array([delta_monde.get(str(x), 0.0) for x in c["jour_nuit"].astype(str)], dtype="float64")
         dv = c["delta"].to_numpy(dtype="float64")
         c["delta"] = np.where(np.isfinite(dv), dv, dm)
         c["alpha_stab"] = c["alpha_stab"] + c["delta"]
+        sd = c["se_delta"].to_numpy(dtype="float64")
+        sd = np.where(np.isfinite(sd), sd, np.nanmedian(sd) if np.isfinite(sd).any() else 0.0)
+        c["se_stab"] = np.sqrt(c["se_stab"] ** 2 + sd ** 2)
         c["facteur_viirs_vers_modis"] = np.exp(-c["alpha_stab"])
         c["plateforme"] = plat
         nom = "conversion_" + plat.lower().replace("-", "")
@@ -257,6 +284,13 @@ def calibrer(cfg: Config, taille_bloc: float = 10.0) -> pd.DataFrame:
 
 
 # --------------------------------------------------------------------------- série harmonisée
+def se_gamma(nT, nM) -> np.ndarray:
+    """Erreur type (échelle log) de la part de Terra p = nT / nM : sqrt((1 - p) / nT)."""
+    nT = np.asarray(nT, dtype="float64") + 0.5
+    p = np.clip(nT / (np.asarray(nM, dtype="float64") + 0.5), 0, 1)
+    return np.sqrt((1 - p) / nT)
+
+
 def construire_serie(cfg: Config, taille_bloc: float = 10.0) -> pd.DataFrame:
     """Série harmonisée en équivalent MODIS (tableau 5 du document de conception).
 
@@ -309,6 +343,7 @@ def construire_serie(cfg: Config, taille_bloc: float = 10.0) -> pd.DataFrame:
     g["eM"] = g["eT"] + g["strate"].map(somme_nA).fillna(0) * g["mois"].map(jA).fillna(0)
     g = g[(g["eT"] > 0) & (g["eM"] > 0)]
     g["gamma"] = np.log(((g["nT"] + 0.5) / g["eT"]) / ((g["nM"] + 0.5) / g["eM"]))
+    g["se_gamma"] = se_gamma(g["nT"], g["nM"])
     tables.ecrire(g, tables.chemin_table(cfg.agregats, "conversion_terra"))
 
     morceaux = []

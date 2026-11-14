@@ -86,7 +86,7 @@ def premier_jour_apres_archive(cfg: Config) -> dict[str, dt.date]:
     return debut
 
 
-def telecharger(cfg: Config, cle: str, fin: dt.date | None = None) -> list[Path]:
+def telecharger(cfg: Config, cle: str, fin: dt.date | None = None, capteurs: list[str] | None = None) -> list[Path]:
     try:
         dispo = disponibilite(cle)
     except Exception as e:  # la disponibilité n'est qu'une optimisation : on passe en NRT si elle échoue
@@ -95,6 +95,8 @@ def telecharger(cfg: Config, cle: str, fin: dt.date | None = None) -> list[Path]
     fin = fin or dt.date.today()
     fichiers = []
     for famille, debut in premier_jour_apres_archive(cfg).items():
+        if capteurs and famille not in capteurs:
+            continue
         prefixe = SOURCES[famille]
         fin_f = min(fin, FIN_SNPP) if famille == "S-NPP" else fin
         jour = debut
@@ -195,12 +197,12 @@ def preparer_api(cfg: Config) -> int:
     return n
 
 
-def executer(cfg: Config, cle: str | None) -> None:
+def executer(cfg: Config, cle: str | None, capteurs: list[str] | None = None) -> None:
     cle = cle or os.environ.get("FIRMS_MAP_KEY")
     if not cle:
         raise SystemExit("Clé FIRMS manquante : export FIRMS_MAP_KEY=... ou --cle ...")
     debuts = premier_jour_apres_archive(cfg)
     for f, d in debuts.items():
         print(f"  {f} : archive jusqu'au {d - dt.timedelta(days=1)}, API à partir du {d}")
-    telecharger(cfg, cle)
+    telecharger(cfg, cle, capteurs=capteurs)
     preparer_api(cfg)

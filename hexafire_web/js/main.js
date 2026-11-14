@@ -96,6 +96,24 @@ async function chercherLieu(ev) {
 }
 
 // ---------------------------------------------------------------- étape 4 : calcul et affichage
+function calculerStats() {
+  const viirs = etat.unite === "viirs" && etat.serie.viirs;
+  const st = statistiques(getIndex(), valeursCourantes(), etat.serie.valeurs,
+                          viirs ? etat.serie.sdViirs : etat.serie.sdModis, etat.serie.brut, etat.serie.frp);
+  if (viirs) {
+    // Le rapport à la normale ne dépend pas de l'unité : le verdict incertain est celui de l'équivalent MODIS
+    // (en VIIRS, numérateur et normale portent le même facteur, qui se simplifie).
+    const sm = statistiques(getIndex(), etat.serie.valeurs, etat.serie.valeurs, etat.serie.sdModis);
+    st.cases.forEach((c, i) => (c.incertain = sm.cases[i].incertain));
+  }
+  return st;
+}
+
+// La valeur affichée est-elle passée par un facteur de conversion ?
+function convertiAffiche(c) {
+  return etat.unite === "viirs" && etat.serie.viirs ? !String(c.source).startsWith("VIIRS") : c.statut === "converti";
+}
+
 function valeursCourantes() {
   return etat.unite === "viirs" && etat.serie.viirs ? etat.serie.viirs : etat.serie.valeurs;
 }
@@ -110,7 +128,7 @@ async function afficher() {
   if (carte) carte.afficher(z);
   $("resume-zone").textContent = t("calcul");
   etat.serie = await serieZone(z);
-  etat.stats = statistiques(getIndex(), valeursCourantes(), etat.serie.valeurs);
+  etat.stats = calculerStats();
   document.querySelectorAll("#panneau .boutons button").forEach(b => (b.disabled = false));
   $("resultats").hidden = false;
   history.replaceState(null, "", encoder(etat));
@@ -156,12 +174,13 @@ function indicateurs() {
   const dansPeriode = completes.filter(([a]) => a >= d0 && a <= d1);
   const [aDer, vDer] = dansPeriode[dansPeriode.length - 1] || [null, 0];
   const rang = completes.filter(([, v]) => v > vDer).length + 1;
-  const ecart = dernier && dernier.rapport !== null ? t("x_mediane", nf(dernier.rapport, 1)) : (dernier && dernier.refus ? t("refus." + dernier.refus) : "—");
+  const ecart = dernier && dernier.rapport !== null ? t("x_mediane", nf(dernier.rapport, 1)) : (dernier && dernier.refus ? t("refus." + dernier.refus) : t("nd"));
   $("indicateurs").innerHTML = [
-    [t("i_dernier"), dernier ? nf(dernier.valeur) : "—", dernier ? `${nomMois(dernier.mois - 1)} ${dernier.annee} · ${t("statut." + dernier.statut)} · ${uniteCourte()}` : ""],
+    [t("i_dernier"), dernier ? nf(dernier.valeur) : t("nd"), dernier ? `${nomMois(dernier.mois - 1)} ${dernier.annee} · ${t("statut." + dernier.statut)} · ${uniteCourte()}`
+      + (dernier.bas !== null ? ` · ${t("i_ic", nf(dernier.bas, dernier.haut < 10 ? 1 : 0), nf(dernier.haut, dernier.haut < 10 ? 1 : 0))}` : "") : ""],
     [t("i_ecart"), ecart, dernier && dernier.classe ? nomClasse(dernier.classe) : ""],
-    [t("i_pic"), pic >= 0 && med[pic] > 0 ? nomMois(pic) : "—", t("i_mediane_ref")],
-    [t("i_rang", aDer ?? "—"), aDer ? t("rang", rang, completes.length) : "—", t("i_total", nf(total), d0, d1)],
+    [t("i_pic"), pic >= 0 && med[pic] > 0 ? nomMois(pic) : t("nd"), t("i_mediane_ref")],
+    [t("i_rang", aDer ?? ""), aDer ? t("rang", rang, completes.length) : t("nd"), t("i_total", nf(total), d0, d1)],
   ].map(([l, v, c]) => `<div class="indicateur"><div class="lib">${l}</div><div class="val">${v}</div><div class="ctx">${c}</div></div>`).join("");
 }
 
@@ -174,10 +193,15 @@ function placerBulle(html, ev) {
 
 function survol(c, ev) {
   if (!c) { placerBulle(null); return; }
-  placerBulle([`<strong>${nomMois(c.mois - 1)} ${c.annee}</strong> — ${t("statut." + c.statut)}`,
+  placerBulle([`<strong>${nomMois(c.mois - 1)} ${c.annee}</strong>, ${t("statut." + c.statut)}`,
     c.valeur === null ? t("b_non_observe") : t("b_valeur", nf(c.valeur, 1), uniteCourte()),
-    t("b_mediane", Number.isFinite(c.mediane) ? nf(c.mediane, 1) : "—"),
-    c.rapport !== null ? t("b_rapport", nf(c.rapport, 2)) : (c.refus ? t("refus." + c.refus) : ""),
+    c.bas !== null ? t("b_ic", nf(c.bas, 1), nf(c.haut, 1)) : "",
+    c.brut > 0 && c.valeur !== null && convertiAffiche(c)
+      ? t("b_brut", nf(c.brut), nf(c.valeur / c.brut, 3)) : "",
+    Number.isFinite(c.mediane) ? t("b_mediane", nf(c.mediane, 1)) : "",
+    c.rapport !== null ? t("b_rapport", nf(c.rapport, 2)) + (c.incertain ? ` · ${t("b_incertain")}` : "")
+      : (c.refus ? t("refus." + c.refus) : ""),
+    c.frpMoy ? t("b_frp", nf(c.frpMoy, 1), t("source." + c.source)) : "",
     t("b_source", t("source." + c.source), Math.round(c.couverture * 100))].filter(Boolean).join("<br>"), ev);
 }
 
@@ -192,7 +216,7 @@ function changerUnite(u) {
   etat.unite = u === "viirs" && viirsDisponible() ? "viirs" : "modis";
   $("in-unite").value = etat.unite;
   if (etat.serie) {
-    etat.stats = statistiques(getIndex(), valeursCourantes(), etat.serie.valeurs);
+    etat.stats = calculerStats();
     history.replaceState(null, "", encoder(etat));
     rafraichir();
   }
@@ -229,7 +253,7 @@ async function dessinerCouche() {
 function survolCouche(p, ev) {
   if (!p) { placerBulle(null); return; }
   const m = getIndex().mois[etat.coucheT];
-  placerBulle([`<strong>${nomMois(m.mois - 1)} ${m.annee}</strong> — ${t("c_cellule")} ${nf(p.lat, 1)}°, ${nf(p.lon, 1)}°`,
+  placerBulle([`<strong>${nomMois(m.mois - 1)} ${m.annee}</strong>, ${t("c_cellule")} ${nf(p.lat, 1)}°, ${nf(p.lon, 1)}°`,
     t("b_valeur", nf(p.v, 1), uniteCourte()),
     p.r >= 0 ? `${t("b_rapport", nf(p.r, 2))} · ${nomClasse(classeDe(p.r))}` : t("c_refus")].join("<br>"), ev);
 }
@@ -237,63 +261,81 @@ function survolCouche(p, ev) {
 // ---------------------------------------------------------------- textes de la méthode
 const METHODE = {
   fr: `
-<h3>Qu'est-ce qu'un point chaud ?</h3><p>Un pixel d'image satellite nettement plus chaud que son voisinage, attribué à un feu
-actif au moment du passage du satellite. Ce n'est pas un incendie : un grand feu produit de nombreux points chauds, et beaucoup de
-petits feux, ou de feux masqués par les nuages, ne sont jamais détectés.</p>
-<h3>Pourquoi harmoniser MODIS et VIIRS ?</h3><p>MODIS (satellites Terra et Aqua, depuis 2000) a des pixels de 1 km. VIIRS
-(Suomi NPP depuis 2012, NOAA-20, NOAA-21) a des pixels de 375 m et voit beaucoup plus de petits feux : à nombre de passages égal,
-environ 5 fois plus de jour et 15 fois plus de nuit. Sans correction, le passage de MODIS à VIIRS crée une fausse hausse.</p>
-<h3>Comment ?</h3><p>Sur 2012–2020, quand les deux capteurs observaient ensemble, HEXAFIRE apprend le facteur de conversion entre eux,
-par région, par mois de l'année et séparément pour le jour et la nuit, en tenant compte du nombre de passages de chaque satellite.
-Les détections VIIRS sont ensuite exprimées en « équivalent MODIS ». Jusqu'en 2020 la série est mesurée par MODIS ; depuis 2021,
-elle vient de VIIRS converti (S-NPP, puis NOAA-20 et NOAA-21, raccordés à S-NPP).</p>
-<h3>Deux unités, une seule série</h3><p>« Équivalent MODIS » : ce que Terra et Aqua auraient détecté. « Équivalent VIIRS » :
-ce que S-NPP seul aurait détecté, obtenu avec les mêmes facteurs pris dans l'autre sens. Les deux unités décrivent la même série ;
-seule l'échelle change. L'écart à la normale est pratiquement le même dans les deux unités.</p>
-<h3>Comment savoir que ça marche ?</h3><p>On cache une année, on convertit VIIRS comme si MODIS n'existait plus, et on vérifie
-que le verdict « mois bas, normal ou haut » est le même qu'avec le vrai MODIS (onglet Capteurs).</p>
-<h3>Écart à la normale</h3><p>Rapport entre la valeur du mois et la médiane du même mois sur 2003–2020. Il n'est pas calculé si
-moins de 10 années de référence sont disponibles ou si la médiane est inférieure à 5 points chauds. Sur la carte, il est calculé
-pour chaque case de 1°.</p>
-<h3>Sources et remerciements</h3><p>Détections de feux : produits de la NASA. Archives mensuelles MCD14ML (MODIS, collections 6
-et 6.1) et VNP14IMGML, VJ114IMGML, VJ214IMGML (VIIRS 375 m, collection 2), téléchargées sur le serveur de l'équipe feux de
-l'université du Maryland (fuoco.geog.umd.edu) ; mois les plus récents par l'API NASA FIRMS. Détail et conditions
-d'utilisation : fichier DATA_SOURCES.md du dépôt.</p>
+<h3>Qu'est-ce qu'un point chaud ?</h3><p>C'est un pixel d'image satellite nettement plus chaud que son voisinage, attribué à un
+feu actif au moment où le satellite passe. Un point chaud n'est donc pas un incendie. Un grand feu en produit beaucoup, alors que
+de nombreux petits feux, ou des feux cachés par les nuages, ne sont jamais détectés.</p>
+<h3>Pourquoi harmoniser MODIS et VIIRS ?</h3><p>MODIS, à bord de Terra et Aqua depuis 2000, observe avec des pixels de 1 km.
+VIIRS, à bord de Suomi NPP depuis 2012 puis de NOAA-20 et NOAA-21, descend à 375 m et voit beaucoup plus de petits feux. À nombre
+de passages égal, il en détecte environ cinq fois plus de jour et quinze fois plus de nuit. Sans correction, le passage de MODIS
+à VIIRS ferait croire à une forte hausse des feux qui n'a jamais eu lieu.</p>
+<h3>Comment HEXAFIRE corrige-t-il ?</h3><p>De 2012 à 2020, les deux capteurs ont observé en même temps. HEXAFIRE en tire un
+facteur de conversion propre à chaque région, à chaque mois de l'année, et distinct pour le jour et la nuit, en tenant compte du
+nombre de passages de chaque satellite. La série est mesurée par MODIS jusqu'en 2020, puis calculée à partir de VIIRS converti.
+NOAA-20 et NOAA-21 sont raccordés à Suomi NPP, qui a cessé d'observer le 2 novembre 2026.</p>
+<h3>Deux unités, une seule série</h3><p>L'équivalent MODIS donne ce que Terra et Aqua auraient détecté. L'équivalent VIIRS donne
+ce que Suomi NPP aurait détecté seul, avec les mêmes facteurs appliqués dans l'autre sens. Seule l'échelle change, et l'écart à
+la normale reste pratiquement le même.</p>
+<h3>Incertitude</h3><p>Chaque facteur est estimé avec une marge d'erreur, que HEXAFIRE propage jusqu'à la zone choisie. L'infobulle
+donne l'intervalle à 95 % des mois convertis et l'onglet Capteurs le dessine en bande autour de la série. En équivalent MODIS,
+cette incertitude concerne les mois VIIRS et les mois où Terra observait seul (2000–2002). En équivalent VIIRS, elle concerne les
+mois MODIS. Une case à bord pointillé signale un verdict incertain, quand l'intervalle chevauche deux classes d'écart. Cette marge
+couvre la conversion, pas les nuages ni les limites de la détection.</p>
+<h3>Comment savoir que la conversion marche ?</h3><p>On met une année de côté, on convertit VIIRS comme si MODIS n'existait plus,
+puis on vérifie que chaque mois reçoit le même verdict (bas, normal ou haut) qu'avec le vrai MODIS. Les résultats sont dans
+l'onglet Capteurs.</p>
+<h3>Écart à la normale</h3><p>C'est le rapport entre la valeur du mois et la médiane du même mois de 2003 à 2020. Il n'est pas
+calculé s'il manque des années de référence (moins de dix) ou si la médiane est inférieure à cinq points chauds. Sur la carte, il
+est calculé pour chaque case de 1°.</p>
+<h3>Puissance radiative (FRP)</h3><p>L'infobulle indique la FRP moyenne par détection, en mégawatts, pour le capteur utilisé ce
+mois-là. Elle n'est pas harmonisée, car MODIS et VIIRS ne mesurent pas la même puissance pour un même feu. Elle se compare donc
+seulement entre mois observés par le même capteur.</p>
+<h3>Sources et remerciements</h3><p>Les détections de feux sont des produits de la NASA, les archives mensuelles MCD14ML (MODIS,
+collections 6 et 6.1) et VNP14IMGML, VJ114IMGML et VJ214IMGML (VIIRS 375 m, collection 2). Elles ont été téléchargées sur le
+serveur de l'équipe feux de l'université du Maryland (fuoco.geog.umd.edu), et les mois les plus récents par l'API NASA FIRMS. Le
+fichier DATA_SOURCES.md du dépôt détaille la provenance et les conditions d'utilisation.</p>
 <p><em>We acknowledge the use of data and/or imagery from NASA's Fire Information for Resource Management System (FIRMS)
 (<a href="https://www.earthdata.nasa.gov/firms" target="_blank" rel="noopener">earthdata.nasa.gov/firms</a>), part of
 NASA's Earth Science Data and Information System (ESDIS).</em></p>
-<p>Références : Giglio et al. (2016), Remote Sensing of Environment 178 ; Schroeder et al. (2014), Remote Sensing of
-Environment 143. Fond de carte et recherche de lieu : © contributeurs OpenStreetMap (ODbL). Frontières : Natural Earth
-(domaine public). Données fournies « en l'état ».</p>`,
+<p>Références principales, Giglio et al. (2016) et Schroeder et al. (2014) dans Remote Sensing of Environment. Fond de carte et
+recherche de lieu © contributeurs OpenStreetMap (ODbL), frontières Natural Earth (domaine public). Les données sont fournies
+en l'état.</p>`,
   en: `
-<h3>What is a hotspot?</h3><p>A satellite image pixel clearly hotter than its surroundings, attributed to an active fire at the time
-of the satellite overpass. It is not a wildfire: a large fire produces many hotspots, and many small fires, or fires hidden by
-clouds, are never detected.</p>
-<h3>Why harmonize MODIS and VIIRS?</h3><p>MODIS (Terra and Aqua satellites, since 2000) has 1 km pixels. VIIRS (Suomi NPP since
-2012, NOAA-20, NOAA-21) has 375 m pixels and sees many more small fires: for the same number of overpasses, about 5 times more by
-day and 15 times more by night. Without correction, the switch from MODIS to VIIRS creates a false increase.</p>
-<h3>How?</h3><p>Over 2012–2020, while both sensors were observing, HEXAFIRE learns the conversion factor between them, by region,
-by month of the year and separately for day and night, accounting for the number of overpasses of each satellite. VIIRS detections
-are then expressed as “MODIS equivalent”. Up to 2020 the series is measured by MODIS; since 2021 it comes from converted VIIRS
-(S-NPP, then NOAA-20 and NOAA-21, linked to S-NPP).</p>
-<h3>Two units, one series</h3><p>“MODIS equivalent”: what Terra and Aqua would have detected. “VIIRS equivalent”: what S-NPP
-alone would have detected, obtained with the same factors applied the other way. Both units describe the same series; only the
-scale changes. The departure from normal is practically the same in both units.</p>
-<h3>How do we know it works?</h3><p>We hide one year, convert VIIRS as if MODIS no longer existed, and check that the verdict
-“low, normal or high month” matches the one obtained with real MODIS (Sensors tab).</p>
-<h3>Departure from normal</h3><p>Ratio between the month's value and the median of the same month over 2003–2020. It is not
-computed when fewer than 10 reference years are available or when the median is below 5 hotspots. On the map, it is computed for
-each 1° cell.</p>
-<h3>Sources and acknowledgements</h3><p>Fire detections: NASA products. Monthly archives MCD14ML (MODIS, collections 6
-and 6.1) and VNP14IMGML, VJ114IMGML, VJ214IMGML (VIIRS 375 m, collection 2), downloaded from the University of Maryland
-fire team server (fuoco.geog.umd.edu); most recent months from the NASA FIRMS API. Details and terms of use: file
-DATA_SOURCES.md in the repository.</p>
+<h3>What is a hotspot?</h3><p>A hotspot is a satellite image pixel clearly hotter than its surroundings, attributed to an active
+fire at the time of the overpass. It is not a wildfire. A large fire produces many hotspots, while many small fires, or fires
+hidden by clouds, are never detected.</p>
+<h3>Why harmonize MODIS and VIIRS?</h3><p>MODIS, on Terra and Aqua since 2000, observes with 1 km pixels. VIIRS, on Suomi NPP since
+2012 and then on NOAA-20 and NOAA-21, goes down to 375 m and sees many more small fires. For the same number of overpasses it
+detects about five times more fires by day and fifteen times more by night. Without correction, the switch from MODIS to VIIRS
+would suggest a sharp rise in fires that never happened.</p>
+<h3>How does HEXAFIRE correct it?</h3><p>From 2012 to 2020 both sensors observed at the same time. HEXAFIRE derives a conversion
+factor for each region and each month of the year, separately for day and night, accounting for the number of overpasses of
+each satellite. The series is measured by MODIS up to 2020 and computed from converted VIIRS afterwards. NOAA-20 and NOAA-21 are
+linked to Suomi NPP, which stopped observing on 2 November 2026.</p>
+<h3>Two units, one series</h3><p>MODIS equivalent gives what Terra and Aqua would have detected. VIIRS equivalent gives what
+Suomi NPP alone would have detected, with the same factors applied the other way. Only the scale changes, and the departure from
+normal stays practically the same.</p>
+<h3>Uncertainty</h3><p>Each factor comes with an error margin, which HEXAFIRE propagates to the selected area. The tooltip gives
+the 95% interval of converted months and the Sensors tab draws it as a band around the series. In MODIS equivalent this
+uncertainty affects VIIRS months and the months when Terra observed alone (2000–2002). In VIIRS equivalent it affects MODIS
+months. A cell with a dotted border marks an uncertain verdict, when the interval overlaps two departure classes. The margin
+covers the conversion, not clouds or the limits of detection.</p>
+<h3>How do we know the conversion works?</h3><p>We set one year aside, convert VIIRS as if MODIS no longer existed, and check that
+each month gets the same verdict (low, normal or high) as with real MODIS. Results are in the Sensors tab.</p>
+<h3>Departure from normal</h3><p>It is the ratio between the month's value and the median of the same month from 2003 to 2020. It
+is not computed when reference years are missing (fewer than ten) or when the median is below five hotspots. On the map it is
+computed for each 1° cell.</p>
+<h3>Fire radiative power (FRP)</h3><p>The tooltip shows the mean FRP per detection, in megawatts, for the sensor used that month.
+It is not harmonized, because MODIS and VIIRS do not measure the same power for the same fire. Compare it only between months
+observed by the same sensor.</p>
+<h3>Sources and acknowledgements</h3><p>Fire detections are NASA products, the monthly archives MCD14ML (MODIS, collections 6 and
+6.1) and VNP14IMGML, VJ114IMGML and VJ214IMGML (VIIRS 375 m, collection 2). They were downloaded from the University of Maryland
+fire team server (fuoco.geog.umd.edu), and the most recent months from the NASA FIRMS API. The file DATA_SOURCES.md in the
+repository details provenance and terms of use.</p>
 <p><em>We acknowledge the use of data and/or imagery from NASA's Fire Information for Resource Management System (FIRMS)
 (<a href="https://www.earthdata.nasa.gov/firms" target="_blank" rel="noopener">earthdata.nasa.gov/firms</a>), part of
 NASA's Earth Science Data and Information System (ESDIS).</em></p>
-<p>References: Giglio et al. (2016), Remote Sensing of Environment 178; Schroeder et al. (2014), Remote Sensing of
-Environment 143. Base map and place search: © OpenStreetMap contributors (ODbL). Borders: Natural Earth (public domain).
-Data provided “as is”.</p>`,
+<p>Main references are Giglio et al. (2016) and Schroeder et al. (2014) in Remote Sensing of Environment. Base map and place
+search © OpenStreetMap contributors (ODbL), borders from Natural Earth (public domain). Data are provided as is.</p>`,
 };
 
 // ---------------------------------------------------------------- démarrage

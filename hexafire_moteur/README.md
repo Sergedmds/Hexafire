@@ -1,4 +1,4 @@
-# HEXAFIRE — moteur d'harmonisation (v0.1)
+# Moteur d'harmonisation HEXAFIRE
 
 Chaîne hors ligne qui transforme les archives FIRMS/UMD en comptages harmonisés.
 
@@ -12,7 +12,7 @@ Chaîne hors ligne qui transforme les archives FIRMS/UMD en comptages harmonisé
 | 4b. Série harmonisée + poids + statuts (S-NPP) | `hexafire/harmonisation.py` | **fait** |
 | 4c. Relais NOAA-20 / NOAA-21 (raccordés à S-NPP), série multi-plateformes | `hexafire/harmonisation.py` | **fait** |
 | 4d. Mois récents via l'API FIRMS (SP sinon NRT) | `hexafire/firms_recent.py` | **fait** |
-| 4e. Incertitude des valeurs converties (tirages) | — | à faire |
+| 4e. Incertitude des valeurs converties (propagation analytique) | `harmonisation.py`, `publication.py` | fait |
 | 5. Validation T1, T2, T4 (une année exclue) + comparaison M0, M1 | `hexafire/validation.py` | **fait** |
 | 6. Publication pour l'application web (format v1, tuiles de 5°) | `hexafire/publication.py` | **fait** |
 

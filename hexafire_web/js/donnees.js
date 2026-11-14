@@ -92,19 +92,24 @@ async function tuile(id) {
 // Série mensuelle de la zone : somme des cellules dont le centre est dans la zone (règle P8).
 // valeurs = harmonisé équivalent MODIS ; viirs = équivalent VIIRS (si publié) ; brut = détections brutes
 // de la source du mois ; lignes = détail cellule x mois [cellule, lat, lon, t, v, b, w].
+// Incertitude de conversion : dans une même strate, le même facteur s'applique à toutes les cellules (écarts types
+// additionnés) ; d'une strate à l'autre, les facteurs sont estimés séparément (variances additionnées).
 export async function serieZone(zone) {
   const valeurs = new Float64Array(index.nMois), brut = new Float64Array(index.nMois);
-  const viirs = new Float64Array(index.nMois);
-  let aViirs = true;
+  const viirs = new Float64Array(index.nMois), frp = new Float64Array(index.nMois);
+  const parStrateE = new Map(), parStrateF = new Map();
+  const B = index.taille_bloc || 10, nLonB = Math.round(360 / B);
+  let aViirs = true, aIncert = false;
   const cellules = new Set(), lignes = [];
   for (const id of tuilesTouchees(zone)) {
     const t = await tuile(id);
-    let derniere = -1, dedans = false, lat = 0, lon = 0;
+    let derniere = -1, dedans = false, lat = 0, lon = 0, strate = 0;
     for (let k = 0; k < t.cellules.length; k++) {
       const c = t.cellules[k];
       if (c !== derniere) {
         [lat, lon] = centreCellule(c);
         dedans = dansZone(zone, lat, lon);
+        strate = Math.floor((90 - lat) / B) * nLonB + Math.floor((lon + 180) / B);
         derniere = c;
         if (dedans) cellules.add(c);
       }
@@ -114,10 +119,24 @@ export async function serieZone(zone) {
       brut[t.t[k]] += b;
       const w = t.w ? t.w[k] : NaN;
       if (t.w) viirs[t.t[k]] += w; else aViirs = false;
-      lignes.push([c, lat, lon, t.t[k], t.v[k], b, w]);
+      if (t.p) frp[t.t[k]] += t.p[k];
+      if (t.e) {
+        aIncert = true;
+        for (const [m, x] of [[parStrateE, t.e[k]], [parStrateF, t.f[k]]]) {
+          if (!m.has(strate)) m.set(strate, new Float64Array(index.nMois));
+          m.get(strate)[t.t[k]] += x;
+        }
+      }
+      lignes.push([c, lat, lon, t.t[k], t.v[k], b, w, t.p ? t.p[k] : NaN]);
     }
   }
-  return { valeurs, viirs: aViirs ? viirs : null, brut, lignes, nCellules: cellules.size, emprise: emprise(zone) };
+  const combiner = m => {
+    const sd = new Float64Array(index.nMois);
+    for (const a of m.values()) for (let i = 0; i < sd.length; i++) sd[i] += a[i] * a[i];
+    return sd.map(Math.sqrt);
+  };
+  return { valeurs, viirs: aViirs ? viirs : null, brut, frp, lignes, nCellules: cellules.size, emprise: emprise(zone),
+           sdModis: aIncert ? combiner(parStrateE) : null, sdViirs: aIncert ? combiner(parStrateF) : null };
 }
 
 export function getIndex() { return index; }

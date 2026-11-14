@@ -24,3 +24,14 @@ __pycache__/
 # Divers
 .DS_Store
 *.tmp
+
+# Fichiers de travail, gardés sur le PC mais pas dans le dépôt
+*.deb
+**/.pytest_cache/
+# Sources des documents : seuls les PDF sont publiés dans le dépôt
+hexafire_web/docs/captures/
+hexafire_web/docs/figures/
+hexafire_web/docs/DOSSIER_TECHNIQUE.md
+hexafire_web/docs/GUIDE_UTILISATEUR.md
+hexafire_web/FICHE_TECHNIQUE.md
+*.tex

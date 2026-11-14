@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>HEXAFIRE — calendrier des feux</title>
+  <title>HEXAFIRE, calendrier des feux</title>
   <script>
     // Thème appliqué avant l'affichage pour éviter un flash
     try { const th = localStorage.getItem("hexafire-theme"); if (th) document.documentElement.dataset.theme = th; } catch (e) {}
@@ -116,7 +116,7 @@
     </select>
   </div>
   <div id="couche-options" hidden>
-    <label><span><span data-i18n="c_mois"></span> : <strong id="couche-mois"></strong></span>
+    <label><span><span data-i18n="c_mois"></span> <strong id="couche-mois"></strong></span>
       <input id="in-couche-t" type="range" min="0" max="0" value="0"></label>
     <div id="couche-legende"></div>
     <p class="aide" data-i18n="c_aide"></p>

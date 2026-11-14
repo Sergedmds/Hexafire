@@ -21,12 +21,14 @@ fi
 [ -f "$WEB/donnees/pays.geojson" ] || echo "Remarque : donnees/pays.geojson absent, le choix par pays sera indisponible en ligne."
 
 # GitHub refuse les fichiers de plus de 100 Mo
-GROS="$(find "$WEB" -type f -size +95M)"
+GROS="$(find "$WEB/donnees" -type f -size +95M)"
 [ -z "$GROS" ] || { echo "Fichiers trop gros pour GitHub :"; echo "$GROS"; exit 1; }
 
 TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT
-cp -r "$WEB/." "$TMP/"
+# Seuls les fichiers servis par le site sont publiés (pas les documents, sources ni fichiers de travail)
+cp "$WEB/index.html" "$TMP/"
+cp -r "$WEB/css" "$WEB/js" "$WEB/donnees" "$TMP/"
 touch "$TMP/.nojekyll"          # servir les fichiers tels quels (pas de traitement Jekyll)
 echo "Taille du site : $(du -sh "$TMP" | cut -f1)"
 
@@ -36,4 +38,4 @@ git checkout -q -b gh-pages
 git add -A
 git commit -q -m "Site HEXAFIRE ($(date +%Y-%m-%d))"
 git push -f "$DEPOT" gh-pages
-echo "Publié. Adresse : https://<pseudo>.github.io/<depot>/ (activer Pages une fois : Settings > Pages > Branch gh-pages / root)"
+echo "Publié sur https://sergedmds.github.io/Hexafire/ (mise à jour en une à deux minutes)."

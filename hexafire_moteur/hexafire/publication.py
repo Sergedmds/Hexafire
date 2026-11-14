@@ -8,7 +8,9 @@ Dossier produit (par défaut ../hexafire_web/donnees) :
          "t": [...],                indice du mois : 0 = novembre 2000, 1 = décembre 2000, ...
          "v": [...],                points chauds harmonisés (équivalent MODIS, jour + nuit)
          "b": [...],                détections brutes de la source utilisée ce mois-là (MODIS ou VIIRS)
-         "w": [...]}                même grandeur en équivalent VIIRS S-NPP (ce que S-NPP seul aurait détecté)
+         "w": [...],                même grandeur en équivalent VIIRS S-NPP (ce que S-NPP seul aurait détecté)
+         "e": [...], "f": [...],    écart type dû à la conversion, en équivalent MODIS (e) et VIIRS (f)
+         "p": [...]}                FRP totale (MW) des détections brutes b ; FRP moyenne = p / b (non harmonisée)
     Les listes ont la même longueur ; seules les valeurs non nulles sont écrites.
     cartes/m_<t>.json           couche de la carte pour le mois t, sur une grille de 1° :
         {"c": [...], "v": [...], "w": [...], "r": [...]}
@@ -67,6 +69,11 @@ def _ecrire_tuiles(df: pd.DataFrame, dossier: Path, pas: float) -> list[str]:
             contenu["b"] = g["b"].astype(int).tolist()
         if "w" in g:   # équivalent VIIRS S-NPP
             contenu["w"] = [round(float(x), 2) for x in g["w"]]
+        if "p" in g:   # FRP totale (MW) des détections brutes de la source du mois (non harmonisée)
+            contenu["p"] = [round(float(x), 1) for x in g["p"]]
+        if "e" in g:   # écarts types de conversion (équivalent MODIS, équivalent VIIRS)
+            contenu["e"] = [round(float(x), 2) for x in g["e"]]
+            contenu["f"] = [round(float(x), 2) for x in g["f"]]
         (dossier / "tuiles" / f"t_{tid}.json").write_text(json.dumps(contenu, separators=(",", ":")))
         ids.append(str(tid))
     return ids
@@ -146,6 +153,67 @@ def equivalent_viirs(cfg: Config, s: pd.DataFrame, taille_bloc: float = 10.0) ->
     return pd.Series(x["N_harm"].to_numpy() * np.exp(a) * rapport_e, index=s.index)
 
 
+def incertitude(cfg: Config, s: pd.DataFrame, taille_bloc: float = 10.0) -> tuple[pd.Series, pd.Series] | None:
+    """Écart type absolu dû à la conversion, pour chaque ligne (cellule, mois, période) de la série.
+
+    Sur l'échelle log, l'erreur type d'une valeur convertie est celle du facteur appliqué :
+      - mois MODIS mesurés ou provisoires : aucune en équivalent MODIS ; se(alpha_S-NPP) en équivalent VIIRS ;
+      - Terra seul (2000-2002) : se(gamma) en équivalent MODIS ; racine(se(gamma)^2 + se(alpha)^2) en VIIRS ;
+      - VIIRS converti : se(alpha) en équivalent MODIS ; aucune en équivalent VIIRS (approximation :
+        S-NPP dominant ; l'écart du relais NOAA est inclus dans se(alpha) des tables NOAA).
+    Écart type absolu = valeur x erreur type (approximation au premier ordre).
+    Renvoie (sd_modis, sd_viirs) alignés sur s, ou None si la conversion S-NPP n'existe pas.
+    """
+    from .harmonisation import se_gamma, se_stabilise, strate_bloc
+    ch = tables.chemin_table(cfg.agregats, "conversion_snpp")
+    if not ch.exists():
+        return None
+    conv = tables.lire(ch)
+    if "se_stab" not in conv:
+        conv["se_stab"] = se_stabilise(conv)
+    x = s[["cellule", "mois", "jour_nuit", "N_harm", "source"]].copy()
+    x["strate"] = strate_bloc(x["cellule"].to_numpy(), cfg.pas, taille_bloc)
+    x = x.merge(conv[["strate", "mois", "jour_nuit", "se_stab"]], on=["strate", "mois", "jour_nuit"], how="left")
+    repli = np.nanmedian(conv["se_stab"].to_numpy(dtype="float64"))
+    se_a = x["se_stab"].fillna(repli).to_numpy(dtype="float64")
+    se_g = np.zeros(len(x))
+    cht = tables.chemin_table(cfg.agregats, "conversion_terra")
+    if cht.exists():
+        g = tables.lire(cht)
+        if "se_gamma" not in g:
+            g["se_gamma"] = se_gamma(g["nT"], g["nM"])
+        x = x.merge(g[["strate", "mois", "jour_nuit", "se_gamma"]], on=["strate", "mois", "jour_nuit"], how="left")
+        se_g = x["se_gamma"].fillna(0.0).to_numpy(dtype="float64")
+    src = x["source"].astype(str)
+    terra = src.str.startswith("Terra").to_numpy()
+    viirs = src.str.startswith("VIIRS").to_numpy()
+    rel_m = np.where(terra, se_g, np.where(viirs, se_a, 0.0))
+    rel_v = np.where(terra, np.sqrt(se_g ** 2 + se_a ** 2), np.where(viirs, 0.0, se_a))
+    n = x["N_harm"].to_numpy(dtype="float64")
+    return (pd.Series(n * rel_m, index=s.index), pd.Series(n * rel_v, index=s.index))
+
+
+def frp_source(cfg: Config, s: pd.DataFrame, source: pd.Series) -> np.ndarray:
+    """FRP totale des détections brutes du capteur utilisé ce mois-là, pour chaque ligne (cellule, annee, mois) de s.
+
+    Terra seul -> Terra ; MODIS -> Terra + Aqua ; VIIRS -> plateformes VIIRS. La FRP n'est pas harmonisée :
+    pour un même feu, MODIS (1 km) et VIIRS (375 m) ne donnent pas la même puissance.
+    """
+    cm = tables.lire(tables.chemin_table(cfg.agregats, "cell_month"),
+                     colonnes=["cellule", "annee", "mois", "capteur", "frp_somme"])
+    cm["groupe"] = np.where(cm["capteur"] == "Terra", "T", np.where(cm["capteur"] == "Aqua", "A", "V"))
+    f = cm.groupby(["cellule", "annee", "mois", "groupe"])["frp_somme"].sum().unstack("groupe", fill_value=0.0)
+    for g in ("T", "A", "V"):
+        if g not in f:
+            f[g] = 0.0
+    cle = pd.MultiIndex.from_frame(s[["cellule", "annee", "mois"]])
+    f = f.reindex(cle, fill_value=0.0)
+    src = source.reindex(cle).astype(str).to_numpy()
+    return np.where(np.char.startswith(src.astype("U"), "Terra"), f["T"].to_numpy(),
+                    np.where(np.char.startswith(src.astype("U"), "VIIRS"), f["V"].to_numpy(),
+                             (f["T"] + f["A"]).to_numpy()))
+
+
 def _ecrire_index(dossier: Path, mois: pd.DataFrame, tuiles: list[str], pas: float, extra: dict) -> None:
     idx = {
         "format": VERSION_FORMAT,
@@ -176,7 +244,16 @@ def publier(cfg: Config, dossier: Path, taille_bloc: float = 10.0) -> None:
         cols.append("w")
     else:
         print("conversion_snpp absente : unité équivalent VIIRS non publiée (lancez d'abord calibrer).")
+    inc = incertitude(cfg, s, taille_bloc)
+    if inc is not None:
+        # jour et nuit ont des facteurs indépendants : variances additionnées dans la cellule
+        s["e2"], s["f2"] = inc[0] ** 2, inc[1] ** 2
+        cols += ["e2", "f2"]
+    src = s.groupby(["cellule", "annee", "mois"])["source"].first()
     s = s.groupby(["cellule", "annee", "mois"])[cols].sum().reset_index()
+    if inc is not None:
+        s["e"], s["f"] = np.sqrt(s.pop("e2")), np.sqrt(s.pop("f2"))
+    s["p"] = frp_source(cfg, s, src)
     s["t"] = indice_mois(s["annee"], s["mois"])
     s = s[(s["t"] >= 0) & (s["N_harm"] > 0)].rename(columns={"N_harm": "v", "n_brut": "b"})
     sm["t"] = indice_mois(sm["annee"], sm["mois"])
@@ -186,7 +263,9 @@ def publier(cfg: Config, dossier: Path, taille_bloc: float = 10.0) -> None:
     if val.exists():
         extra["validation"] = json.loads(pd.read_csv(val).to_json(orient="records", force_ascii=False))
     dossier.mkdir(parents=True, exist_ok=True)
-    tuiles = _ecrire_tuiles(s[["cellule", "t", "v", "b"] + (["w"] if w is not None else [])], dossier, cfg.pas)
+    extra["taille_bloc"] = taille_bloc
+    tuiles = _ecrire_tuiles(s[["cellule", "t", "v", "b", "p"] + (["w"] if w is not None else [])
+                              + (["e", "f"] if inc is not None else [])], dossier, cfg.pas)
     n_cartes = _ecrire_cartes(s, sm[["t", "annee", "mois", "statut"]], dossier, cfg.pas)
     _ecrire_index(dossier, sm, tuiles, cfg.pas, extra)
     print(f"Publication : {len(tuiles)} tuiles, {len(s):,} valeurs, {len(sm)} mois, {n_cartes} cartes -> {dossier}")
@@ -223,7 +302,11 @@ def publier_exemple(dossier: Path, pas: float = 0.25, graine: int = 0) -> None:
                 v = rng.poisson(lam * 3) / 3.0
                 ok = v > 0
                 brut = np.round(v[ok] * (6.0 if a >= 2021 else 1.0)).astype(int)
-                lignes.append(pd.DataFrame({"cellule": cells[ok], "t": t, "v": v[ok], "b": brut, "w": v[ok] * 4.2}))
+                conv = a >= 2021 or t < 20
+                lignes.append(pd.DataFrame({"cellule": cells[ok], "t": t, "v": v[ok], "b": brut, "w": v[ok] * 4.2,
+                                            "e": v[ok] * (0.12 if conv else 0.0),
+                                            "f": v[ok] * 4.2 * (0.0 if a >= 2021 else 0.12),
+                                            "p": brut * rng.gamma(2.0, 6.0 if a >= 2021 else 15.0, ok.sum())}))
     df = pd.concat(lignes, ignore_index=True)
     mois = []
     for a in annees:
@@ -246,5 +329,5 @@ def publier_exemple(dossier: Path, pas: float = 0.25, graine: int = 0) -> None:
                    "erreur_mediane": 0.245, "marche_max_annee": 0.108},
                   {"methode": "M0 raccord brut", "kappa": 0.013, "fausses_anomalies": 0.924, "biais_median": 1.946,
                    "erreur_mediane": 1.946, "marche_max_annee": 1.979}]
-    _ecrire_index(dossier, pd.DataFrame(mois), tuiles, pas, {"exemple": True, "validation": validation})
+    _ecrire_index(dossier, pd.DataFrame(mois), tuiles, pas, {"exemple": True, "validation": validation, "taille_bloc": 10.0})
     print(f"Jeu d'EXEMPLE (fictif) : {len(tuiles)} tuiles, {len(df):,} valeurs, {n_cartes} cartes -> {dossier}")

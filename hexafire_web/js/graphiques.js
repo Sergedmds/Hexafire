@@ -81,6 +81,7 @@ export function brutHarmonise(conteneur, index, serie) {
   index.mois.forEach((m, t) => {
     if (!parAn.has(m.annee)) parAn.set(m.annee, { v: 0, b: 0, n: 0 });
     const a = parAn.get(m.annee); a.v += serie.valeurs[t]; a.b += serie.brut[t]; a.n++;
+    a.sd = (a.sd || 0) + (serie.sdModis ? serie.sdModis[t] : 0);   // somme : prudent (mois corrélés)
   });
   const ans = [...parAn].filter(([, a]) => a.n === 12).map(([an]) => an);
   if (!ans.length || ans.every(a => !Number.isFinite(parAn.get(a).b))) { conteneur.textContent = t("g_brut_absent"); return; }
@@ -95,9 +96,19 @@ export function brutHarmonise(conteneur, index, serie) {
     texte(s, X(iB) - L / 2 + 4, y0 + 10, t("g_bascule"), { "font-size": 10 });
   }
   el("polyline", { points: ans.map((a, i) => `${X(i)},${Y(parAn.get(a).b)}`).join(" "), fill: "none", stroke: "#8a8a8a", "stroke-width": 2 }, s);
+  if (serie.sdModis) {
+    const lim = (a, signe) => { const p = parAn.get(a); return p.v > 0 ? p.v * Math.exp(signe * 1.96 * p.sd / p.v) : 0; };
+    const haut = ans.map((a, i) => `${X(i)},${Y(Math.min(lim(a, 1), max))}`);
+    const bas = ans.map((a, i) => `${X(i)},${Y(lim(a, -1))}`).reverse();
+    el("polygon", { points: haut.concat(bas).join(" "), fill: "#b4541a", "fill-opacity": 0.22, stroke: "none" }, s);
+  }
   el("polyline", { points: ans.map((a, i) => `${X(i)},${Y(parAn.get(a).v)}`).join(" "), fill: "none", stroke: "#b4541a", "stroke-width": 2.5 }, s);
   ans.forEach((a, i) => { if (a % 5 === 0) texte(s, X(i), H - 8, a, { "text-anchor": "middle" }); });
   texte(s, x0, 10, t("g_brut_note"), { "font-size": 10 });
+  if (serie.sdModis) {
+    const n = Object.assign(document.createElement("p"), { className: "aide", textContent: t("g_bande") });
+    conteneur.appendChild(n);
+  }
 }
 
 export function tableAnnees(conteneur, stats) {

@@ -53,7 +53,8 @@ def test_publication_exemple(tmp_path):
     idx = json.loads((tmp_path / "donnees" / "index.json").read_text())
     assert idx["format"] == 2 and idx["mois"][0]["t"] == 0 and idx["tuiles"] and "viirs" in idx["unites"]
     t = json.loads((tmp_path / "donnees" / "tuiles" / f"t_{idx['tuiles'][0]}.json").read_text())
-    assert len(t["cellules"]) == len(t["t"]) == len(t["v"]) == len(t["w"]) > 0
+    assert len(t["cellules"]) == len(t["t"]) == len(t["v"]) == len(t["w"]) == len(t["e"]) == len(t["f"]) > 0
+    assert idx["taille_bloc"] == 10.0 and len(t["p"]) == len(t["v"])
     # couche de la carte : un fichier par mois observé, rapports calculés pour les cellules actives
     dernier = idx["mois"][-1]["t"]
     c = json.loads((tmp_path / "donnees" / "cartes" / f"m_{dernier}.json").read_text())

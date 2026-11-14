@@ -20,7 +20,7 @@ const OBSERVE = new Set(["mesuré", "converti", "provisoire"]);
 
 // valeursSeuil : série équivalent MODIS, sur laquelle s'applique le seuil « médiane >= 5 », pour que le même
 // mois soit accepté ou refusé quelle que soit l'unité affichée.
-export function statistiques(index, valeurs, valeursSeuil = valeurs) {
+export function statistiques(index, valeurs, valeursSeuil = valeurs, ecartsTypes = null, brut = null, frp = null) {
   const [r0, r1] = index.periode_reference;
   const parMois = Array.from({ length: 12 }, () => []), parMoisSeuil = Array.from({ length: 12 }, () => []);
   index.mois.forEach((m, t) => {
@@ -42,7 +42,17 @@ export function statistiques(index, valeurs, valeursSeuil = valeurs) {
       else { rapport = v / med; classe = classeDe(rapport); }
     }
     const rang = v === null ? null : parMois[k].filter(x => x < v).length / Math.max(nRef, 1);
-    return { ...m, t, valeur: v, mediane: med, moyenne: moyenne[k], rapport, classe, refus, rang };
+    // intervalle à 95 % dû à la conversion (échelle log : v x exp(+-1,96 sd / v))
+    let bas = null, haut = null, incertain = false;
+    const sd = ecartsTypes ? ecartsTypes[t] : 0;
+    if (v !== null && v > 0 && sd > 0) {
+      const r = 1.96 * sd / v;
+      bas = v * Math.exp(-r); haut = v * Math.exp(r);
+      if (rapport !== null) incertain = classeDe(bas / med) !== classeDe(haut / med);
+    }
+    return { ...m, t, valeur: v, mediane: med, moyenne: moyenne[k], rapport, classe, refus, rang,
+             bas, haut, incertain, brut: brut && v !== null ? brut[t] : null,
+             frpMoy: frp && brut && v !== null && brut[t] > 0 ? frp[t] / brut[t] : null };
   });
   return { cases, mediane, moyenne, q1, q3 };
 }
@@ -103,6 +113,9 @@ export function dessiner(conteneur, stats, mode, survol, periode = null) {
       el("path", { d: `M${x + L - 7} ${y} L${x + L} ${y} L${x + L} ${y + 7} Z`, fill: "#3b3b3b", opacity: 0.55 }, g);
     if (c.valeur === 0)
       el("circle", { cx: x + L / 2, cy: y + H / 2, r: 1.6, fill: "#9a9a9a" }, g);
+    if (mode === "anomalie" && c.incertain)
+      el("rect", { x: x + 1.5, y: y + 1.5, width: L - 3, height: H - 3, fill: "none", stroke: "#333",
+        "stroke-width": 1, "stroke-dasharray": "2 2" }, g);
     if (mode === "anomalie" && c.valeur !== null && c.refus)
       el("rect", { x, y, width: L, height: H, fill: "#ffffff", class: "fond-svg", opacity: 0.6 }, g);
     g.addEventListener("mousemove", ev => survol(c, ev));
@@ -119,5 +132,6 @@ export function dessinerLegende(conteneur, mode) {
     morceaux.push(`<span>${t("lg_faible")} <i class="pastille" style="background:linear-gradient(90deg,${SEQUENTIELLE.join(",")});width:90px"></i> ${t("lg_fort")}</span>`);
   }
   morceaux.push(`<span>${t("lg_converti")}</span><span>${t("lg_partiel")}</span><span>${t("lg_zero")}</span>`);
+  if (mode === "anomalie") morceaux.push(`<span>${t("lg_incertain")}</span>`);
   conteneur.innerHTML = morceaux.join("");
 }

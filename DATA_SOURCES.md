@@ -1,4 +1,4 @@
-# HEXAFIRE — Data sources, provenance and terms of use
+# HEXAFIRE data sources, provenance and terms of use
 
 This document states **where each dataset used by HEXAFIRE comes from, how it was retrieved, which version was used and
 under which conditions**. It follows the NASA Space Apps rule: *“For non-U.S. Government websites, participants must
@@ -24,7 +24,7 @@ Rows 4–7 are only used by the web interface, not to compute the harmonized ser
 
 ## 2. Fire data in detail
 
-### 2.1 MODIS — MCD14ML (Terra + Aqua, 1 km)
+### 2.1 MODIS MCD14ML (Terra and Aqua, 1 km)
 
 - **Product**: MODIS Collection 6 and 6.1 monthly active fire location files (MCD14ML), the standard
   (science-quality) product, not near-real-time.
@@ -44,7 +44,7 @@ Rows 4–7 are only used by the web interface, not to compute the harmonized ser
 - **Reference**: Giglio, L., Schroeder, W., Justice, C. O. (2016). *The collection 6 MODIS active fire detection
   algorithm and fire products.* Remote Sensing of Environment, 178, 31–41.
 
-### 2.2 VIIRS — VNP14IMGML, VJ114IMGML, VJ214IMGML (375 m)
+### 2.2 VIIRS VNP14IMGML, VJ114IMGML and VJ214IMGML (375 m)
 
 - **Products**: VIIRS 375 m active fire monthly location files, Collection 2 (version `C2.04`):
   - Suomi NPP (VNP14IMGML): January 2012 → July 2026;

@@ -25,11 +25,12 @@ const MERCI = "We acknowledge the use of data and/or imagery from NASA's Fire In
   "(https://www.earthdata.nasa.gov/firms), part of NASA's Earth Science Data and Information System (ESDIS). Data provided as is.";
 
 export function exporterCSV(stats, zone, unite = "modis") {
-  const lignes = ["annee,mois,valeur,statut,source,couverture,mediane_mois,rapport_mediane,classe"];
+  const lignes = ["annee,mois,valeur,borne_basse_95,borne_haute_95,detections_brutes,frp_moyenne_mw,statut,source,couverture,mediane_mois,rapport_mediane,classe,verdict_incertain"];
+  const f2 = x => (x === null || x === undefined || !Number.isFinite(x) ? "" : x.toFixed(2));
   for (const c of stats.cases) {
-    lignes.push([c.annee, c.mois, c.valeur === null ? "" : c.valeur.toFixed(2), c.statut, c.source,
+    lignes.push([c.annee, c.mois, f2(c.valeur), f2(c.bas ?? c.valeur), f2(c.haut ?? c.valeur), f2(c.brut), f2(c.frpMoy), c.statut, c.source,
       c.couverture, isNaN(c.mediane) ? "" : c.mediane.toFixed(2), c.rapport === null ? "" : c.rapport.toFixed(3),
-      c.classe ? c.classe.cle : (c.refus || "")].map(x => `"${String(x).replace(/"/g, '""')}"`).join(","));
+      c.classe ? c.classe.cle : (c.refus || ""), c.incertain ? "oui" : ""].map(x => `"${String(x).replace(/"/g, '""')}"`).join(","));
   }
   telecharger(`hexafire_calendrier_${unite}.csv`, entete(zone, unite).concat(lignes).join("\n"), "text/csv;charset=utf-8");
 }
@@ -68,11 +69,11 @@ export function exporterCellules(serie, zone) {
     `# valeur_viirs: ${(idx.unites && idx.unites.viirs) || "-"}`,
     "# detections_brutes = detections of the sensor used that month (MODIS until 2020, VIIRS after)",
     `# ${t("x_avert")}`, `# ${MERCI}`,
-    "cellule,lat_centre,lon_centre,annee,mois,valeur_modis,valeur_viirs,detections_brutes,source"];
-  for (const [c, lat, lon, tt, v, b, w] of serie.lignes) {
+    "cellule,lat_centre,lon_centre,annee,mois,valeur_modis,valeur_viirs,detections_brutes,frp_totale_mw,source"];
+  for (const [c, lat, lon, tt, v, b, w, p] of serie.lignes) {
     const m = idx.mois[tt];
     lignes.push([c, lat.toFixed(3), lon.toFixed(3), m.annee, m.mois, v.toFixed(2),
-      Number.isFinite(w) ? w.toFixed(2) : "", Number.isFinite(b) ? b : "", m.source].join(","));
+      Number.isFinite(w) ? w.toFixed(2) : "", Number.isFinite(b) ? b : "", Number.isFinite(p) ? p.toFixed(1) : "", m.source].join(","));
   }
   telecharger("hexafire_cellules_mois.csv", lignes.join("\n"), "text/csv;charset=utf-8");
 }
@@ -81,7 +82,9 @@ export function exporterJSON(stats, zone, unite = "modis") {
   const idx = getIndex();
   const out = { zone, unite: (idx.unites && idx.unites[unite]) || idx.unite, periode_reference: idx.periode_reference,
     genere_le: idx.genere_le, exemple: !!idx.exemple, remerciements: MERCI,
-    mois: stats.cases.map(c => ({ annee: c.annee, mois: c.mois, valeur: c.valeur, statut: c.statut, source: c.source,
+    mois: stats.cases.map(c => ({ annee: c.annee, mois: c.mois, valeur: c.valeur, borne_basse_95: c.bas ?? c.valeur,
+      borne_haute_95: c.haut ?? c.valeur, detections_brutes: c.brut, frp_moyenne_mw: c.frpMoy, verdict_incertain: !!c.incertain,
+      statut: c.statut, source: c.source,
       mediane: Number.isFinite(c.mediane) ? c.mediane : null, rapport: c.rapport, classe: c.classe ? c.classe.cle : null })) };
   telecharger(`hexafire_calendrier_${unite}.json`, JSON.stringify(out, null, 1), "application/json");
 }
