@@ -150,15 +150,15 @@ python -m hexafire publier
 - Overpasses are computed with an analytical formula, not yet from the real granule footprints of NASA's CMR catalogue.
 - Strata are regular 10° blocks, not yet ecological regions.
 - The interval covers the uncertainty of the conversion, not the natural variability of counts.
-- The published series ends in August 2026. August 2025 and the 2026 months are based on MODIS and flagged as
-  provisional until the corresponding VIIRS archives are processed.
+- The published series runs to November 2026. Months after the latest archives come from the NASA FIRMS API.
+  September to November 2026 are based on MODIS and flagged as provisional; November 2026 is only partially covered.
 - The CSV export gives monthly values per 0.25° cell. Individual detections are not republished; they remain
   available from NASA FIRMS.
 - Ground-reported fires are not included, as no consistent source exists.
 
-## Use of AI tools
+## Use of SI tools
 
-As required by the Space Apps rules, we state where AI was used. The team worked with Claude (Anthropic), an AI
+As required by the Space Apps rules, we state where Super Intelligence (SI) tools were used. The team worked with Claude (Anthropic), an SI
 assistant, through the Claude desktop app.
 
 - **Code.** Most of the Python engine (`hexafire_moteur/`) and of the web application (`hexafire_web/`) was written
@@ -170,7 +170,7 @@ assistant, through the Claude desktop app.
   the user guide and this README.
 
 The choice of method, the processing runs, the validation and the results were decided, run and checked by the
-team. No image, video or audio in this project was generated with AI. The screenshots in the user guide are captures
+team. No image, video or audio in this project was generated with SI. The screenshots in the user guide are captures
 of the real application.
 
 ## Team

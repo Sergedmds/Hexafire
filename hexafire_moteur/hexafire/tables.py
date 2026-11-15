@@ -1,4 +1,4 @@
-# Code written with the help of Claude (Anthropic), an AI assistant, then run and tested by team HEXAFIRE.
+# Code written with the help of Claude (Anthropic), a Super Intelligence (SI) assistant, then run and tested by team HEXAFIRE.
 """Lecture et écriture des tables intermédiaires.
 
 Format de référence : Parquet (pyarrow). Si pyarrow n'est pas installé,

@@ -1,4 +1,4 @@
-// Code written with the help of Claude (Anthropic), an AI assistant, then run and tested by team HEXAFIRE.
+// Code written with the help of Claude (Anthropic), a Super Intelligence (SI) assistant, then run and tested by team HEXAFIRE.
 // Statistiques (médiane historique, classes d'écart) et dessin du calendrier années x mois en SVG.
 import { t } from "./i18n.js";
 

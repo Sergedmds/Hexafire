@@ -1,4 +1,4 @@
-# Code written with the help of Claude (Anthropic), an AI assistant, then run and tested by team HEXAFIRE.
+# Code written with the help of Claude (Anthropic), a Super Intelligence (SI) assistant, then run and tested by team HEXAFIRE.
 """Grille régulière en degrés : numérotation et centres des cellules.
 
 Numérotation : cellule = ligne * n_lon + colonne, ligne 0 au nord (90° N),

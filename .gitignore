@@ -35,3 +35,7 @@ hexafire_web/docs/DOSSIER_TECHNIQUE.md
 hexafire_web/docs/GUIDE_UTILISATEUR.md
 hexafire_web/FICHE_TECHNIQUE.md
 *.tex
+
+# Textes du formulaire de soumission (non publiés)
+soumission_*.html
+README_new.md

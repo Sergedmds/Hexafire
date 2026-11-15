@@ -1,4 +1,4 @@
-// Code written with the help of Claude (Anthropic), an AI assistant, then run and tested by team HEXAFIRE.
+// Code written with the help of Claude (Anthropic), a Super Intelligence (SI) assistant, then run and tested by team HEXAFIRE.
 // Chargement des fichiers publiés par le moteur (format d'échange v1) et calcul de la série d'une zone.
 // Types de zone : cercle {lat, lon, rayon}, rect {sud, nord, ouest, est},
 //                 poly {anneaux: [[[lon, lat], ...]]}, pays {code, nom, anneaux: [...]}.

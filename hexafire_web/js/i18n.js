@@ -1,4 +1,4 @@
-// Code written with the help of Claude (Anthropic), an AI assistant, then run and tested by team HEXAFIRE.
+// Code written with the help of Claude (Anthropic), a Super Intelligence (SI) assistant, then run and tested by team HEXAFIRE.
 // Textes de l'interface en français et en anglais.
 // Dans le HTML : data-i18n="cle" (texte), data-i18n-html="cle" (HTML), data-i18n-title, data-i18n-aria, data-i18n-ph.
 

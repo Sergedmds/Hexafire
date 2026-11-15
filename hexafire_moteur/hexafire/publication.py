@@ -1,4 +1,4 @@
-# Code written with the help of Claude (Anthropic), an AI assistant, then run and tested by team HEXAFIRE.
+# Code written with the help of Claude (Anthropic), a Super Intelligence (SI) assistant, then run and tested by team HEXAFIRE.
 """Étape 6 : publication des fichiers lus par l'application web (format d'échange v1).
 
 Dossier produit (par défaut ../hexafire_web/donnees) :
@@ -265,6 +265,10 @@ def publier(cfg: Config, dossier: Path, taille_bloc: float = 10.0) -> None:
         extra["validation"] = json.loads(pd.read_csv(val).to_json(orient="records", force_ascii=False))
     dossier.mkdir(parents=True, exist_ok=True)
     extra["taille_bloc"] = taille_bloc
+    # Total mondial harmonisé par mois (équivalent MODIS), lu par la page d'accueil de l'application
+    nt = int(sm["t"].max()) + 1 if len(sm) else 0
+    tot = s.groupby("t")["v"].sum().reindex(range(nt), fill_value=0.0)
+    extra["totaux"] = {"v": [int(round(x)) for x in tot.to_numpy()]}
     tuiles = _ecrire_tuiles(s[["cellule", "t", "v", "b", "p"] + (["w"] if w is not None else [])
                               + (["e", "f"] if inc is not None else [])], dossier, cfg.pas)
     n_cartes = _ecrire_cartes(s, sm[["t", "annee", "mois", "statut"]], dossier, cfg.pas)

@@ -1,4 +1,4 @@
-# Code written with the help of Claude (Anthropic), an AI assistant, then run and tested by team HEXAFIRE.
+# Code written with the help of Claude (Anthropic), a Super Intelligence (SI) assistant, then run and tested by team HEXAFIRE.
 """Étape 5 : validation de l'harmonisation (tests T1, T2, T4 du document de conception).
 
 Principe : validation croisée « une année exclue » sur les années où MODIS et S-NPP

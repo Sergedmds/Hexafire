@@ -1,4 +1,4 @@
-// Code written with the help of Claude (Anthropic), an AI assistant, then run and tested by team HEXAFIRE.
+// Code written with the help of Claude (Anthropic), a Super Intelligence (SI) assistant, then run and tested by team HEXAFIRE.
 // Petits graphiques SVG sans bibliothèque : profil saisonnier, saison cumulée, brut vs harmonisé, tableaux.
 import { nomMois } from "./calendrier.js";
 import { t, nf } from "./i18n.js";
