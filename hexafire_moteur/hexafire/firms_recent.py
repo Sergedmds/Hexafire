@@ -1,3 +1,4 @@
+# Code written with the help of Claude (Anthropic), an AI assistant, then run and tested by team HEXAFIRE.
 """Mois récents : récupération via l'API FIRMS pour la période non couverte par les archives mensuelles.
 
 Les archives de l'Université du Maryland sont publiées 1 à 2 mois après la fin du mois. Pour les mois

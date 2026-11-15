@@ -1,3 +1,4 @@
+# Code written with the help of Claude (Anthropic), an AI assistant, then run and tested by team HEXAFIRE.
 """Étape 3 : occasions d'observation E (nombre de passages au-dessus d'une cellule).
 
 Méthode de niveau 0 (analytique, utilisée pour le hackathon)

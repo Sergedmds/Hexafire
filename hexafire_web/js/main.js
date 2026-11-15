@@ -1,3 +1,4 @@
+// Code written with the help of Claude (Anthropic), an AI assistant, then run and tested by team HEXAFIRE.
 // Point d'entrée de l'application HEXAFIRE (mise en page inspirée du Data Access Viewer de NASA POWER).
 import { chargerIndex, chargerPays, serieZone, getIndex, carteMois, centreCellule } from "./donnees.js";
 import { statistiques, dessiner, dessinerLegende, nomMois, nomClasse, classeDe, couleurNiveau, CLASSES } from "./calendrier.js";

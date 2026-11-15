@@ -1,3 +1,4 @@
+# Code written with the help of Claude (Anthropic), an AI assistant, then run and tested by team HEXAFIRE.
 """Point d'entrée du moteur HEXAFIRE.
 
     python -m hexafire inventaire         # ce qui est téléchargé et sera utilisé

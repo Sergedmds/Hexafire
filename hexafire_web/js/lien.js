@@ -1,3 +1,4 @@
+// Code written with the help of Claude (Anthropic), an AI assistant, then run and tested by team HEXAFIRE.
 // Lien partageable : la zone et les options sont encodées dans l'adresse (#...), comme l'URL de requête de NASA POWER.
 
 export function encoder(etat) {

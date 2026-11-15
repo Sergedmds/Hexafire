@@ -1,3 +1,4 @@
+# Code written with the help of Claude (Anthropic), an AI assistant, then run and tested by team HEXAFIRE.
 """Lecture des archives mensuelles MCD14ML (MODIS) et Vxx14IMGML (VIIRS).
 
 Toutes les détections sont ramenées à un schéma commun :

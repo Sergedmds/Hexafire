@@ -1,3 +1,4 @@
+// Code written with the help of Claude (Anthropic), an AI assistant, then run and tested by team HEXAFIRE.
 // Carte MapLibre plein écran : choix d'un point, rectangle (2 clics), polygone (clics + double-clic),
 // couche mensuelle (points chauds ou écart à la normale) sur une grille de 1°, fond clair ou sombre.
 // Sans connexion (MapLibre non chargé), l'application reste utilisable par saisie des coordonnées.

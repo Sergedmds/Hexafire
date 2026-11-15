@@ -1,3 +1,4 @@
+# Code written with the help of Claude (Anthropic), an AI assistant, then run and tested by team HEXAFIRE.
 """Étape 2 : préparation des détections (règles P1 à P9 du document de conception).
 
 Pour chaque archive mensuelle :

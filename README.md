@@ -1,117 +1,178 @@
-# HEXAFIRE, a harmonized MODIS and VIIRS hotspot calendar from 2000 to today
+# HEXAFIRE
 
-**NASA Space Apps Challenge 2026, challenge “Harmonization of MODIS and VIIRS Hot Spots”**
-Team HEXAFIRE (ENSGMM / UNSTIM, Benin)
+**A harmonized MODIS and VIIRS hotspot calendar, from November 2000 to today**
 
-**Live app** [sergedmds.github.io/Hexafire](https://sergedmds.github.io/Hexafire/). User guide in French in [`hexafire_web/docs/GUIDE_UTILISATEUR.pdf`](hexafire_web/docs/GUIDE_UTILISATEUR.pdf).
+NASA Space Apps Challenge 2026, challenge *Harmonization of MODIS and VIIRS Hot Spots*.
+Team HEXAFIRE, ENSGMM, Université Nationale des Sciences, Technologies, Ingénierie et Mathématiques (UNSTIM), Abomey, Benin.
+
+| | |
+|---|---|
+| **Web application** | <https://sergedmds.github.io/Hexafire/> |
+| **Research document** | [English](HEXAFIRE_document_en.pdf) · [Français](HEXAFIRE_document.pdf) |
+| **Data provenance** | [`DATA_SOURCES.md`](DATA_SOURCES.md) |
+
+---
 
 ## The problem
 
-NASA has mapped active fires from space with **MODIS** (Terra, Aqua) since 2000 and with **VIIRS** (Suomi NPP, NOAA-20,
-NOAA-21) since 2012. VIIRS pixels are smaller (375 m vs 1 km), so VIIRS detects **about 5× more hotspots by day and
-15× more by night**. As MODIS is retired, any long-term analysis that switches from MODIS to VIIRS shows a **false jump**
-in fire activity. Fire managers, early-warning services and scientists cannot compare a recent season with 20 years of
-history.
+NASA has mapped active fires from space with MODIS (Terra and Aqua) since 2000, and with VIIRS (Suomi NPP, NOAA-20,
+NOAA-21) since 2012. VIIRS pixels are smaller (375 m against 1 km), so for the same number of overpasses VIIRS detects
+about 5 times more hotspots than MODIS by day and 15 times more at night.
 
-## Our solution
+MODIS is now reaching the end of its life. Any long record that switches from MODIS to VIIRS shows a rise in fire
+activity that never happened. A fire manager comparing this season with twenty years of history cannot tell a severe
+season from a more sensitive satellite.
 
-1. **Harmonization engine** (`hexafire_moteur/`, Python). It learns the VIIRS → MODIS conversion over 2012–2020, when
-   both sensors observed together:
-   - a conditional binomial model with an observation-opportunity offset (number of satellite overpasses);
-   - fitted by **region × month of year × day/night**, then stabilized by shrinkage;
-   - NOAA-20 and NOAA-21 are chained to S-NPP.
+## Our approach
 
-   The result is **one consistent monthly series per 0.25° cell from November 2000 to today**, expressed in MODIS
-   equivalent (or VIIRS equivalent).
-2. **Web app** (`hexafire_web/`, static HTML/JS, layout inspired by NASA POWER). Draw any area in the world (point +
-   radius, box, polygon, country) and get:
-   - a **year × month calendar** of hotspots, or of **departure from the 2003–2020 normal** (colour-blind-safe palette);
-   - seasonal analyses;
-   - the sensor-change proof;
-   - a monthly world map;
-   - the 95% conversion uncertainty of each converted month, and the mean fire radiative power (not harmonized);
-   - CSV / JSON / PNG / SVG downloads and a shareable link.
+HEXAFIRE expresses VIIRS detections in MODIS units, using the years 2012–2020 when both sensors flew together.
 
-   Available in French and English, with light and dark themes.
+1. **Same number of looks.** For each 0.25° cell, the engine computes how many times each satellite passed over it
+   in a month, from orbital geometry and the days with data.
+2. **A conversion that ignores the fires themselves.** For a cell-month seen by both sensors, the VIIRS share of the
+   combined count depends only on the sensitivity gap and on the overpass ratio. The true fire activity cancels out.
+   The gap is estimated by maximum likelihood for each 10° block, calendar month and period (day or night), and
+   estimates from sparse blocks are pulled towards their block average.
+3. **One series.** Terra and Aqua are kept as measured until December 2020. Converted VIIRS takes over in January
+   2021, before the orbital drift of Terra and Aqua. NOAA-20 and NOAA-21 are linked to Suomi NPP, and several VIIRS
+   satellites are averaged, never added.
+4. **Honest labels.** Every month carries an observation status (measured, converted, provisional, partial coverage)
+   and every converted value carries a 95% conversion interval.
 
-## Does it work? Leave-one-year-out validation
+The full model, with its equations, is described in the research document.
 
-For each test year, the conversion is fitted without that year. VIIRS is converted as if MODIS no longer existed, and
-the monthly verdict (low / normal / high) is compared with real MODIS. Results on 2012–2015, over 7,604 region-months:
+## Validation
 
-| Method | Kappa (≥ 0.5) | False anomalies (≤ 0.15) | Median bias (\|·\| < 0.10) | Median error (< 0.25) | Max yearly step (< 0.10) |
+The challenge asks that the sensor of origin no longer matter. We test exactly that.
+
+For each year from 2012 to 2020, the conversion is fitted without that year. Suomi NPP is then converted as if MODIS
+no longer existed, and each region-month gets a verdict (low, normal or high, against the 2003–2011 MODIS
+percentiles). This verdict is compared with the one given by real MODIS, over 17,309 region-months.
+
+| Method | Cohen's κ | False anomalies | Median bias | Median error | Largest annual error |
 |---|---|---|---|---|---|
-| **HEXAFIRE** | **0.735** ✓ | **0.098** ✓ | **0.014** ✓ | **0.127** ✓ | **0.051** ✓ |
-| M1: one global factor | 0.553 ✓ | 0.239 ✗ | 0.045 ✓ | 0.255 ✗ | 0.123 ✗ |
-| M0: raw VIIRS | 0.015 ✗ | 0.925 ✗ | 1.962 ✗ | 1.962 ✗ | 2.028 ✗ |
+| **HEXAFIRE** | **0.747** | **9.0%** | **0.007** | **0.125** | **0.049** |
+| One global factor (same overpass correction, day and night) | 0.558 | 23.9% | 0.032 | 0.262 | 0.117 |
+| Raw VIIRS | 0.014 | 92.1% | 1.955 | 1.955 | 2.028 |
+| Target | ≥ 0.5 | ≤ 15% | below 0.10 | < 0.25 | < 0.10 |
 
-HEXAFIRE beats the single-factor approach: the 95% bootstrap interval of kappa(HEXAFIRE) − kappa(M1) is
-[0.168 ; 0.195], entirely above 0. *Validation will be extended to 2012–2020 once all VIIRS archives are processed.*
+Errors are differences of log(1 + count). The 95% interval of κ(HEXAFIRE) − κ(global factor), obtained by
+resampling the nine test years, is [0.174, 0.205].
 
-## Documentation (French)
+The global factor already uses the overpass correction and the day/night split, so the gain comes from the
+region- and month-specific conversion. The separate contribution of each component has not yet been measured.
 
-| Document | Content |
-|---|---|
-| [`hexafire_web/docs/DOSSIER_TECHNIQUE.pdf`](hexafire_web/docs/DOSSIER_TECHNIQUE.pdf) | Full technical dossier: architecture, dependencies, mathematical models, data formats, results |
-| [`hexafire_moteur/GUIDE_EXECUTION.md`](hexafire_moteur/GUIDE_EXECUTION.md) | Running the engine step by step, and how to read its outputs |
-| [`hexafire_web/docs/GUIDE_UTILISATEUR.pdf`](hexafire_web/docs/GUIDE_UTILISATEUR.pdf) | Illustrated user guide of the web app |
-| [`hexafire_web/FICHE_TECHNIQUE.pdf`](hexafire_web/FICHE_TECHNIQUE.pdf) | Web app technical sheet |
-| [`DATA_SOURCES.md`](DATA_SOURCES.md) | Data provenance and terms of use (English) |
+## The web application
 
-## Repository layout
+A static site: no server, no account, no installation. It runs on a computer or a phone, in English or French.
 
-| Path | Content |
-|---|---|
-| `hexafire_moteur/` | Harmonization engine (Python 3.12): download prep, aggregation, overpasses, calibration, validation, series, publication. Run guide: `GUIDE_EXECUTION.md` (FR) |
-| `hexafire_web/` | Static web app; `FICHE_TECHNIQUE.pdf` (technical sheet), `docs/GUIDE_UTILISATEUR.pdf` (user guide) |
-| `telecharger_archives.sh` | Download of the MODIS/VIIRS monthly archives (UMD SFTP mirror of NASA FIRMS) |
-| `HEXAFIRE_document.pdf` | Research document (state of the art, methods, results) |
-| `publier_site.sh` | Deploys the app and its data to GitHub Pages (`gh-pages` branch) |
+- **Choose an area.** Draw a rectangle or a polygon, set a point and a radius, pick a country or search for a place.
+- **Calendar.** A year × month grid of harmonized hotspots, or of the departure from the 2003–2020 median, with
+  colour-blind-safe palettes. Four indicators sit above it: the latest month available, its departure from normal,
+  its rank among past years, and the usual peak month of the area. Hovering a month shows its value, its 95%
+  conversion interval, the raw detections, the median of that month and the mean fire radiative power (FRP).
+- **Analyses.** Seasonal profile, cumulative season against past seasons, ranking of years, most unusual months.
+- **Sensors.** The raw record and the harmonized record side by side: the jump at the sensor change disappears,
+  year-to-year variation stays. Converted months are shown with their uncertainty band, next to the validation table.
+- **Map of the month.** Harmonized hotspots or departure from normal on a 1° world grid, with a month slider.
+- **Downloads.** Calendar (CSV, JSON, PNG, SVG), cell × month table of the area (CSV) and a shareable link.
 
-Large data folders (`donnees_brutes/`, `donnees_preparees/`, `agregats/`, `journaux/`, `hexafire_web/donnees/`) are not
-versioned. They are rebuilt by the engine.
+Values can be shown in MODIS-equivalent or VIIRS-equivalent units. The departure from normal is practically the same
+in both.
 
-## Quick start
+## Data
 
-```bash
-cd hexafire_moteur
-python3 -m venv .venv && source .venv/bin/activate && pip install -r requirements.txt   # Python >= 3.11
-pytest -q                                   # 14 tests
-python -m hexafire publier --exemple        # fictitious dataset, to try the app
-cd ../hexafire_web && python3 -m http.server 8000   # open http://localhost:8000
-```
+| Data | Version | Period used |
+|---|---|---|
+| MODIS active fire monthly archives, MCD14ML (Terra, Aqua, 1 km) | C6 006.03, then C6.1 061.03 | Nov 2000 – Aug 2026 |
+| VIIRS 375 m active fire monthly archives, VNP14IMGML (Suomi NPP) | Collection 2 | Jan 2012 – Jul 2026 |
+| VIIRS 375 m, VJ114IMGML (NOAA-20) and VJ214IMGML (NOAA-21) | Collection 2 | Apr 2018 / Mar 2023 – Jul 2026 |
+| NASA FIRMS API | NRT and standard products | Months after the latest archive |
 
-Full pipeline on real data: `inventaire → preparer → (firms) → agreger → occasions → calibrer → valider → serie → publier`
-(see `hexafire_moteur/GUIDE_EXECUTION.md`).
-
-## NASA data used
-
-- **MODIS** active fires: MCD14ML monthly archives, collections 6 (2000–2022) and 6.1 (2023 →).
-- **VIIRS** 375 m active fires: VNP14IMGML (S-NPP), VJ114IMGML (NOAA-20), VJ214IMGML (NOAA-21), collection 2.
-- **NASA FIRMS** API for the most recent months (NRT / standard products).
-
-The monthly archives were downloaded from the University of Maryland fire team server (`fuoco.geog.umd.edu`, a
-non-U.S. Government site that hosts the NASA products). **Full provenance, versions, retrieval dates and terms of use:
-[`DATA_SOURCES.md`](DATA_SOURCES.md).**
+The monthly archives are the NASA products published by the NASA fire science team on the University of Maryland
+server. Versions, retrieval dates and terms of use are listed in [`DATA_SOURCES.md`](DATA_SOURCES.md).
 
 > We acknowledge the use of data and/or imagery from NASA's Fire Information for Resource Management System (FIRMS)
 > (https://www.earthdata.nasa.gov/firms), part of NASA's Earth Science Data and Information System (ESDIS).
 
-References: Giglio et al. (2016), *Remote Sensing of Environment* 178:31–41; Schroeder et al. (2014), *Remote Sensing of
-Environment* 143:85–96. Basemap and place search: © OpenStreetMap contributors (ODbL). Country borders: Natural Earth
-(public domain). NASA does not endorse this project; data are provided “as is”.
+Basemap and place search: © OpenStreetMap contributors (ODbL). Country borders: Natural Earth (public domain).
+Map rendering: MapLibre GL JS (BSD-3-Clause). NASA does not endorse this project.
 
-## Limits
+## Repository
 
-- A hotspot is not a wildfire, and the absence of hotspots does not prove the absence of fire.
-- Overpasses are computed analytically (level 0). Strata are 10° blocks; GFED regions × land cover are planned.
-- Values for converted months carry a conversion uncertainty that is not yet displayed.
+| Path | Content |
+|---|---|
+| `hexafire_moteur/` | Harmonization engine (Python 3.12): preparation, aggregation, overpasses, calibration, validation, series, publication |
+| `hexafire_web/` | Static web application (HTML, CSS, JavaScript) |
+| `telecharger_archives.sh` | Download of the MODIS and VIIRS monthly archives |
+| `publier_site.sh` | Deployment of the application and its data to GitHub Pages (`gh-pages` branch) |
+| `HEXAFIRE_document_en.pdf`, `HEXAFIRE_document.pdf` | Research document, in English and French |
+| `DATA_SOURCES.md` | Data provenance and terms of use |
+
+Supplementary material in French: technical dossier (`hexafire_web/docs/DOSSIER_TECHNIQUE.pdf`), user guide
+(`hexafire_web/docs/GUIDE_UTILISATEUR.pdf`), engine run guide (`hexafire_moteur/GUIDE_EXECUTION.md`).
+
+Raw and intermediate data (several tens of GB) are not versioned. The engine rebuilds them.
+
+## Running it
+
+Requires Python 3.11 or later.
+
+```bash
+cd hexafire_moteur
+python3 -m venv .venv && source .venv/bin/activate
+pip install -r requirements.txt
+pytest -q                                  # 14 tests
+
+python -m hexafire publier --exemple       # small fictitious dataset, to try the application
+cd ../hexafire_web && python3 -m http.server 8000
+# open http://localhost:8000  (English: http://localhost:8000/#l=en)
+```
+
+Full pipeline on real data, after `telecharger_archives.sh`:
+
+```bash
+python -m hexafire inventaire
+python -m hexafire preparer
+python -m hexafire agreger
+python -m hexafire occasions
+python -m hexafire calibrer
+python -m hexafire valider
+FIRMS_MAP_KEY=<your key> python -m hexafire firms     # optional: months after the latest archive
+python -m hexafire serie
+python -m hexafire publier
+```
+
+## Limitations
+
+- A hotspot is not a wildfire, and the absence of hotspots does not prove the absence of fire. Clouds and smoke
+  hide some fires.
+- Overpasses are computed with an analytical formula, not yet from the real granule footprints of NASA's CMR catalogue.
+- Strata are regular 10° blocks, not yet ecological regions.
+- The interval covers the uncertainty of the conversion, not the natural variability of counts.
+- The published series ends in August 2026. August 2025 and the 2026 months are based on MODIS and flagged as
+  provisional until the corresponding VIIRS archives are processed.
+- The CSV export gives monthly values per 0.25° cell. Individual detections are not republished; they remain
+  available from NASA FIRMS.
+- Ground-reported fires are not included, as no consistent source exists.
 
 ## Use of AI tools
 
-AI tools were used during development, as required by the Space Apps rules. A full description will be provided in
-the project submission.
+As required by the Space Apps rules, we state where AI was used. The team worked with Claude (Anthropic), an AI
+assistant, through the Claude desktop app.
+
+- **Code.** Most of the Python engine (`hexafire_moteur/`) and of the web application (`hexafire_web/`) was written
+  with Claude's help, from the team's specifications. The team ran it on the real data, tested it (14 automated
+  tests) and reported the errors that were then fixed. Every source file starts with a line stating this.
+- **Research and analysis.** Literature search, critical review of the method, help with reading the calibration
+  and validation outputs.
+- **Writing.** Drafting, editing and French–English translation of the research document, the technical dossier,
+  the user guide and this README.
+
+The choice of method, the processing runs, the validation and the results were decided, run and checked by the
+team. No image, video or audio in this project was generated with AI. The screenshots in the user guide are captures
+of the real application.
 
 ## Team
 
-Team HEXAFIRE, ENSGMM / UNSTIM (Abomey, Benin).
+Team HEXAFIRE, ENSGMM, UNSTIM, Abomey, Benin.

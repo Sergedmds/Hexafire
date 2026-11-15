@@ -1,3 +1,4 @@
+# Code written with the help of Claude (Anthropic), an AI assistant, then run and tested by team HEXAFIRE.
 """Étape 6 : publication des fichiers lus par l'application web (format d'échange v1).
 
 Dossier produit (par défaut ../hexafire_web/donnees) :
